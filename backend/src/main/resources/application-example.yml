@@ -1,0 +1,22 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/czspig_product_critic?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: root
+    password: your_mysql_password
+
+app:
+  anonymous-session-id: anonymous-dev-session
+  ai:
+    provider: auto
+    fallback-to-mock: true
+
+deepseek:
+  api-key: ${DEEPSEEK_API_KEY}
+  base-url: https://api.deepseek.com
+  model: deepseek-v4-flash
+  timeout-seconds: 60
+  max-tokens: 3000
+  temperature: 0.6
