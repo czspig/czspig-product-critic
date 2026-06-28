@@ -15,37 +15,38 @@ public class MockAiProvider implements AiProvider {
         ReviewMode mode = ReviewMode.requireValid(request.getMode());
         int roastLevel = request.getRoastLevel();
         String ideaName = summarizeIdea(request.getContent());
+        String focus = inferFocus(request.getContent());
 
         ReviewReportDto report = new ReviewReportDto();
-        report.setOneLineVerdict(oneLineVerdict(mode, roastLevel));
+        report.setOneLineVerdict(oneLineVerdict(mode, roastLevel, focus));
         report.setGoDecision(goDecision(request.getContent()));
-        report.setGoDecisionReason(goDecisionReason(report.getGoDecision()));
+        report.setGoDecisionReason(goDecisionReason(report.getGoDecision(), focus));
         report.setBeatScore(mockBeatScore(request.getContent(), roastLevel));
         report.setPositioningScore(mockPositioningScore(request.getContent(), roastLevel));
-        report.setPainPointAnalysis("目标用户看起来是有一个模糊任务要完成的早期用户，但真实痛点还没有被压缩到一个高频、刚需、强动机的时刻。现在的替代方案通常是微信群、表格、手工搜索或直接找熟人解决，所以你必须证明用户愿意离开这些低成本替代方案。");
+        report.setPainPointAnalysis("Mock 评审基于输入「%s」判断：当前重点像是%s，但真实痛点还没有被压缩到一个高频、刚需、强动机的时刻。现在的替代方案通常是微信群、表格、手工搜索或直接找熟人解决，所以你必须证明用户愿意为了这个场景离开低成本替代方案。".formatted(ideaName, focus));
         report.setFakeDemandRisks(List.of(
-                "用户嘴上说“最好都能有”，但第一版如果没有明确触发场景，很可能只被试用一次就流失。",
+                "围绕「%s」的用户可能嘴上说“最好都能有”，但第一版如果没有明确触发场景，很可能只被试用一次就流失。".formatted(focus),
                 "尚未验证用户是否愿意迁移、持续提交真实内容，或为更省时间的结果付出成本。",
-                "最小实验：找 5 个目标用户，用手工方式交付一次结果，观察他们是否愿意第二次主动使用。"
+                "最小实验：找 5 个目标用户，用手工方式交付一次「%s」相关结果，观察他们是否愿意第二次主动使用。".formatted(ideaName)
         ));
         report.setFeatureRedundancyCheck(List.of(
-                "第一版不该做社区、积分、复杂资料页、多角色后台和泛化配置，它们只是让产品看起来完整。",
+                "第一版不该为了「%s」过早做社区、积分、复杂资料页、多角色后台和泛化配置，它们只是让产品看起来完整。".formatted(focus),
                 "凡是不能帮助用户完成一次核心任务、保存结果或复用结果的功能，都应延后。",
                 "第一版应该砍到一个输入、一个结构化结果、一条历史记录和一个可复制 Prompt。"
         ));
         report.setColdStartProblems(List.of(
-                "第一批用户应来自你能直接触达的目标人群，例如独立开发者群、课程作业小组或真实甲方项目。",
+                "第一批用户应来自你能直接触达且真的关心「%s」的人群，例如独立开发者群、课程作业小组或真实甲方项目。".formatted(focus),
                 "如果没有内容、数据或供需双方，产品仍要能靠一次单点交付成立，否则会被冷启动拖死。",
                 "最小冷启动路径：用示例和手工邀请让用户完成一次提交，再用报告质量驱动复用。"
         ));
         report.setMvpSuggestions(List.of(
-                "第一版只保留输入、评审模式、生成报告、历史详情、复制 Prompt 和导出 Markdown。",
+                "第一版只保留能验证「%s」的输入、评审模式、生成报告、历史详情、复制 Prompt 和导出 Markdown。".formatted(focus),
                 "明确不做登录、支付、分享、RAG、多 Agent、社区和后台配置。",
                 "验证方式是让 10 个目标用户提交真实想法，观察是否愿意保存报告并复制开发 Prompt。"
         ));
 
         ReviewReportDto.MinimumBuildVersion minimumBuildVersion = new ReviewReportDto.MinimumBuildVersion();
-        minimumBuildVersion.setGoal("验证“用户输入产品想法后，可以获得犀利但可执行的产品评审报告”这一核心闭环。");
+        minimumBuildVersion.setGoal("验证「%s」能否通过一次提交获得可执行反馈这一核心闭环。".formatted(ideaName));
         minimumBuildVersion.setCoreFeatures(List.of(
                 "提交产品想法并选择评审模式、吐槽强度",
                 "生成包含 10 个固定模块的结构化评审报告",
@@ -59,14 +60,14 @@ public class MockAiProvider implements AiProvider {
                 "复杂后台管理",
                 "RAG 和多 Agent 编排"
         ));
-        minimumBuildVersion.setSuccessMetric("至少 10 个目标用户完成提交，其中 5 人愿意复制开发 Prompt 或基于报告调整需求范围。");
+        minimumBuildVersion.setSuccessMetric("至少 10 个目标用户围绕「%s」完成提交，其中 5 人愿意复制开发 Prompt 或基于报告调整需求范围。".formatted(focus));
         minimumBuildVersion.setValidationPlan(List.of(
                 "用 3 个典型样例跑通报告质量，确认 goDecision、风险和 MVP 建议有明显差异。",
                 "邀请 5-10 个目标用户提交真实想法，记录他们是否保存报告或复制 Prompt。",
                 "复盘用户最常复制的段落，把低价值模块砍掉或改写。"
         ));
         report.setMinimumBuildVersion(minimumBuildVersion);
-        report.setDeveloperPrompt(buildDeveloperPrompt(ideaName));
+        report.setDeveloperPrompt(buildDeveloperPrompt(ideaName, focus));
         return report;
     }
 
@@ -80,25 +81,25 @@ public class MockAiProvider implements AiProvider {
         return "mock-product-reviewer-v1";
     }
 
-    private String oneLineVerdict(ReviewMode mode, int roastLevel) {
+    private String oneLineVerdict(ReviewMode mode, int roastLevel, String focus) {
         if (mode == ReviewMode.MENTOR) {
-            return "这个想法有可塑性，但第一版必须更小，先抓住一个愿意反复使用的真实场景。";
+            return "这个想法在「%s」上有可塑性，但第一版必须更小，先抓住一个愿意反复使用的真实场景。".formatted(focus);
         }
         if (mode == ReviewMode.CLIENT) {
-            return "能做，但现在还缺少可验收的商业结果，先把核心价值和交付边界讲清楚。";
+            return "能做，但「%s」现在还缺少可验收的商业结果，先把核心价值和交付边界讲清楚。".formatted(focus);
         }
         if (roastLevel >= 3) {
-            return "这个想法不是没价值，但现在有点像把愿望清单包装成产品，得先狠砍范围。";
+            return "「%s」不是没价值，但现在有点像把愿望清单包装成产品，得先狠砍范围。".formatted(focus);
         }
-        return "这个想法有场景，但现在还像功能清单，不像一个真正的产品切口。";
+        return "「%s」有场景，但现在还像功能清单，不像一个真正的产品切口。".formatted(focus);
     }
 
-    private String buildDeveloperPrompt(String ideaName) {
+    private String buildDeveloperPrompt(String ideaName, String focus) {
         return """
                 你是 Codex，请基于当前仓库实现“%s”的最小可运行版本。先读取 README、接口文档、入口文件和锁文件，确认技术栈、运行方式与现有组件后再修改代码。
 
                 项目目标：
-                - 让用户输入一个产品想法后，获得结构化产品评审、MVP 收缩建议和可执行开发 Prompt。
+                - 围绕“%s”让用户输入一个产品想法后，获得结构化产品评审、MVP 收缩建议和可执行开发 Prompt。
 
                 技术栈建议：
                 - 前端沿用 Vue 3、Vite、TypeScript、Pinia 和 Vue Router。
@@ -121,7 +122,7 @@ public class MockAiProvider implements AiProvider {
                 - 复制开发 Prompt、复制完整报告和导出 Markdown 可用。
                 - 前端 build 通过，错误信息不泄露密钥、系统提示或堆栈。
                 - 不提交任何 API Key。
-                """.formatted(ideaName);
+                """.formatted(ideaName, focus);
     }
 
     private String goDecision(String content) {
@@ -135,11 +136,11 @@ public class MockAiProvider implements AiProvider {
         return "CONTINUE";
     }
 
-    private String goDecisionReason(String decision) {
+    private String goDecisionReason(String decision, String focus) {
         return switch (decision) {
-            case "CONTINUE" -> "方向值得继续，但必须先收缩到一个高频核心场景，用最小闭环验证用户是否会反复使用。";
-            case "PIVOT" -> "方向有价值，但当前切入点像需求清单，交付边界和验收标准太散，需要先改成单一业务目标。";
-            default -> "当前证据不足，更多是想象中的完整产品，建议先用手工实验验证真实需求再开发。";
+            case "CONTINUE" -> "「%s」方向值得继续，但必须先收缩到一个高频核心场景，用最小闭环验证用户是否会反复使用。".formatted(focus);
+            case "PIVOT" -> "「%s」方向有价值，但当前切入点像需求清单，交付边界和验收标准太散，需要先改成单一业务目标。".formatted(focus);
+            default -> "「%s」当前证据不足，更多是想象中的完整产品，建议先用手工实验验证真实需求再开发。".formatted(focus);
         };
     }
 
@@ -173,6 +174,23 @@ public class MockAiProvider implements AiProvider {
             return normalized;
         }
         return normalized.substring(0, 32) + "...";
+    }
+
+    private String inferFocus(String content) {
+        String normalized = content == null ? "" : content;
+        if (normalized.contains("甲方") || normalized.contains("验收") || normalized.contains("公告")) {
+            return "甲方交付和验收边界";
+        }
+        if (normalized.contains("独立开发者") || normalized.contains("Prompt") || normalized.contains("MVP")) {
+            return "独立开发者的需求收缩";
+        }
+        if (normalized.contains("社区") || normalized.contains("广场") || normalized.contains("内容")) {
+            return "内容冷启动和复用";
+        }
+        if (normalized.contains("用户管理") || normalized.contains("后台")) {
+            return "后台管理和权限边界";
+        }
+        return summarizeIdea(normalized);
     }
 
     private int clamp(int score) {

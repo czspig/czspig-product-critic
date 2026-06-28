@@ -18,6 +18,7 @@ public class AiProviderRouter implements AiProvider {
     private final MockAiProvider mockAiProvider;
     private final DeepSeekAiProvider deepSeekAiProvider;
     private final ThreadLocal<AiProvider> lastProvider = new ThreadLocal<>();
+    private final ThreadLocal<Boolean> lastFallbackUsed = ThreadLocal.withInitial(() -> false);
 
     public AiProviderRouter(
             AppAiProperties appAiProperties,
@@ -34,14 +35,17 @@ public class AiProviderRouter implements AiProvider {
     public ReviewReportDto review(CreateReviewRequest request, String prompt) {
         AiProvider selected = selectProvider();
         lastProvider.set(selected);
+        lastFallbackUsed.set(false);
         try {
             ReviewReportDto report = selected.review(request, prompt);
             lastProvider.set(selected);
+            lastFallbackUsed.set(false);
             return report;
         } catch (RuntimeException ex) {
             if (selected != mockAiProvider && appAiProperties.isFallbackToMock()) {
                 ReviewReportDto fallbackReport = mockAiProvider.review(request, prompt);
                 lastProvider.set(mockAiProvider);
+                lastFallbackUsed.set(true);
                 return fallbackReport;
             }
             if (ex instanceof BizException) {
@@ -61,6 +65,15 @@ public class AiProviderRouter implements AiProvider {
     public String modelName() {
         AiProvider provider = lastProvider.get();
         return provider == null ? selectProvider().modelName() : provider.modelName();
+    }
+
+    @Override
+    public ProviderExecution execution() {
+        AiProvider provider = lastProvider.get();
+        if (provider == null) {
+            provider = selectProvider();
+        }
+        return new ProviderExecution(provider.providerName(), provider.modelName(), lastFallbackUsed.get());
     }
 
     private AiProvider selectProvider() {

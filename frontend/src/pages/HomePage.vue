@@ -53,6 +53,7 @@
             <div class="mini-scores">
               <span>毒打 {{ store.currentReview.beatScore }}/100</span>
               <span>定位 {{ store.currentReview.positioningScore }}/100</span>
+              <span v-if="providerBadge">{{ providerBadge }}</span>
             </div>
 
             <div class="summary-notes">
@@ -141,6 +142,16 @@ const goDecisionReason = computed(
 const successMetric = computed(
   () => store.currentReview?.report?.minimumBuildVersion?.successMetric || '先用小样本验证用户是否愿意完成提交并复用报告。',
 );
+const providerBadge = computed(() => {
+  const review = store.currentReview;
+  if (!review?.providerName) {
+    return '';
+  }
+  if (review.fallbackUsed) {
+    return `Fallback: ${review.providerName}`;
+  }
+  return review.providerName === 'mock' ? 'Mock 评审' : review.providerName;
+});
 const keyValidationPlan = computed(() => {
   const plan = store.currentReview?.report?.minimumBuildVersion?.validationPlan?.filter(Boolean) ?? [];
   return plan.length > 0 ? plan.slice(0, 2) : ['找 3-5 个目标用户提交真实想法。', '观察他们是否愿意保存报告或复制开发 Prompt。'];

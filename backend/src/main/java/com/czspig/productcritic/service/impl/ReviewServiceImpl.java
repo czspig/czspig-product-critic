@@ -29,12 +29,15 @@ import com.czspig.productcritic.mapper.ReviewRecordMapper;
 import com.czspig.productcritic.service.ReviewService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ReviewServiceImpl implements ReviewService {
 
+    private static final Logger log = LoggerFactory.getLogger(ReviewServiceImpl.class);
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final String PROMPT_VERSION = "p2-review-quality-v1";
 
@@ -73,6 +76,13 @@ public class ReviewServiceImpl implements ReviewService {
         normalizedRequest.setRoastLevel(request.getRoastLevel());
 
         String prompt = promptBuilder.build(normalizedRequest);
+        String promptHash = sha256(prompt);
+        log.debug(
+                "create review: contentPreview={}, providerBeforeCall={}, promptHash={}",
+                preview(safeContent, 80),
+                safeProviderName(),
+                promptHash
+        );
         long startedAt = System.currentTimeMillis();
         LocalDateTime now = LocalDateTime.now();
 
@@ -96,10 +106,18 @@ public class ReviewServiceImpl implements ReviewService {
 
         try {
             ReviewReportDto report = aiProvider.review(normalizedRequest, prompt);
+            AiProvider.ProviderExecution execution = aiProvider.execution();
+            log.debug(
+                    "review success: provider={}, model={}, fallbackUsed={}, promptHash={}",
+                    execution.providerName(),
+                    execution.modelName(),
+                    execution.fallbackUsed(),
+                    promptHash
+            );
             outputParser.validate(report);
 
             String reportJson = writeJson(report);
-            String reportMarkdown = renderMarkdown(safeContent, mode, request.getRoastLevel(), report);
+            String reportMarkdown = renderMarkdown(safeContent, mode, request.getRoastLevel(), report, execution);
             LocalDateTime finishedAt = LocalDateTime.now();
             record.setOneLineVerdict(report.getOneLineVerdict());
             record.setBeatScore(report.getBeatScore());
@@ -108,18 +126,18 @@ public class ReviewServiceImpl implements ReviewService {
             record.setReportMarkdown(reportMarkdown);
             record.setStatus(ReviewStatus.SUCCESS.name());
             record.setErrorMessage(null);
-            record.setModelName(safeModelName());
+            record.setModelName(execution.modelName());
             record.setUpdatedAt(finishedAt);
             reviewRecordMapper.updateById(record);
 
-            insertAiCallLog(record, prompt, report, startedAt);
-            return toDetailResponse(record, report);
+            insertAiCallLog(record, promptHash, report, startedAt, execution);
+            return toDetailResponse(record, report, execution);
         } catch (BizException ex) {
-            markFailed(record, prompt, startedAt, ex);
+            markFailed(record, promptHash, startedAt, ex);
             throw ex;
         } catch (RuntimeException ex) {
             BizException wrapped = new BizException(ErrorCode.AI_PROVIDER_ERROR, "AI 评审服务暂时不可用，请稍后再试");
-            markFailed(record, prompt, startedAt, wrapped);
+            markFailed(record, promptHash, startedAt, wrapped);
             throw wrapped;
         }
     }
@@ -158,16 +176,21 @@ public class ReviewServiceImpl implements ReviewService {
 
     private void insertAiCallLog(
             ReviewRecordEntity record,
-            String prompt,
+            String promptHash,
             ReviewReportDto report,
-            long startedAt) {
+            long startedAt,
+            AiProvider.ProviderExecution execution) {
         AiCallLogEntity log = new AiCallLogEntity();
         log.setReviewRecordId(record.getId());
-        log.setProvider(aiProvider.providerName());
-        log.setModelName(aiProvider.modelName());
-        log.setPromptHash(sha256(prompt));
-        log.setRequestSummary("mode=%s, roastLevel=%d, contentLength=%d".formatted(
-                record.getMode(), record.getRoastLevel(), record.getInputContent().length()));
+        log.setProvider(execution.providerName());
+        log.setModelName(execution.modelName());
+        log.setPromptHash(promptHash);
+        log.setRequestSummary("mode=%s, roastLevel=%d, contentLength=%d, contentPreview=%s, fallbackUsed=%s".formatted(
+                record.getMode(),
+                record.getRoastLevel(),
+                record.getInputContent().length(),
+                preview(record.getInputContent(), 80),
+                execution.fallbackUsed()));
         log.setResponseSummary(report.getOneLineVerdict());
         log.setInputTokens(0);
         log.setOutputTokens(0);
@@ -178,6 +201,18 @@ public class ReviewServiceImpl implements ReviewService {
     }
 
     private ReviewDetailResponse toDetailResponse(ReviewRecordEntity record, ReviewReportDto report) {
+        AiProvider.ProviderExecution execution = new AiProvider.ProviderExecution(
+                safeProviderName(),
+                record.getModelName(),
+                false
+        );
+        return toDetailResponse(record, report, execution);
+    }
+
+    private ReviewDetailResponse toDetailResponse(
+            ReviewRecordEntity record,
+            ReviewReportDto report,
+            AiProvider.ProviderExecution execution) {
         ReviewDetailResponse response = new ReviewDetailResponse();
         response.setId(record.getId());
         response.setInputContent(record.getInputContent());
@@ -192,6 +227,9 @@ public class ReviewServiceImpl implements ReviewService {
         response.setReportMarkdown(record.getReportMarkdown());
         response.setStatus(record.getStatus());
         response.setErrorMessage(record.getErrorMessage());
+        response.setProviderName(execution.providerName());
+        response.setModelName(execution.modelName());
+        response.setFallbackUsed(execution.fallbackUsed());
         response.setCreatedAt(formatTime(record.getCreatedAt()));
         return response;
     }
@@ -213,24 +251,37 @@ public class ReviewServiceImpl implements ReviewService {
 
     private void markFailed(
             ReviewRecordEntity record,
-            String prompt,
+            String promptHash,
             long startedAt,
             BizException ex) {
+        AiProvider.ProviderExecution execution = aiProvider.execution();
+        log.debug(
+                "review failed: provider={}, model={}, fallbackUsed={}, promptHash={}, errorCode={}",
+                execution.providerName(),
+                execution.modelName(),
+                execution.fallbackUsed(),
+                promptHash,
+                ex.getErrorCode().getCode()
+        );
         String safeMessage = sanitizeError(ex.getMessage());
         LocalDateTime failedAt = LocalDateTime.now();
         record.setStatus(ReviewStatus.FAILED.name());
         record.setErrorMessage(safeMessage);
-        record.setModelName(safeModelName());
+        record.setModelName(execution.modelName());
         record.setUpdatedAt(failedAt);
         reviewRecordMapper.updateById(record);
 
         AiCallLogEntity log = new AiCallLogEntity();
         log.setReviewRecordId(record.getId());
-        log.setProvider(safeProviderName());
+        log.setProvider(execution.providerName());
         log.setModelName(record.getModelName());
-        log.setPromptHash(sha256(prompt));
-        log.setRequestSummary("mode=%s, roastLevel=%d, contentLength=%d".formatted(
-                record.getMode(), record.getRoastLevel(), record.getInputContent().length()));
+        log.setPromptHash(promptHash);
+        log.setRequestSummary("mode=%s, roastLevel=%d, contentLength=%d, contentPreview=%s, fallbackUsed=%s".formatted(
+                record.getMode(),
+                record.getRoastLevel(),
+                record.getInputContent().length(),
+                preview(record.getInputContent(), 80),
+                execution.fallbackUsed()));
         log.setResponseSummary(null);
         log.setInputTokens(0);
         log.setOutputTokens(0);
@@ -288,6 +339,14 @@ public class ReviewServiceImpl implements ReviewService {
         return normalized.substring(0, 80) + "...";
     }
 
+    private String preview(String content, int maxLength) {
+        String normalized = content == null ? "" : content.replaceAll("\\s+", " ").trim();
+        if (normalized.length() <= maxLength) {
+            return normalized;
+        }
+        return normalized.substring(0, maxLength) + "...";
+    }
+
     private String writeJson(ReviewReportDto report) {
         try {
             return objectMapper.writeValueAsString(report);
@@ -308,9 +367,11 @@ public class ReviewServiceImpl implements ReviewService {
             String content,
             ReviewMode mode,
             Integer roastLevel,
-            ReviewReportDto report) {
+            ReviewReportDto report,
+            AiProvider.ProviderExecution execution) {
         StringBuilder builder = new StringBuilder();
         builder.append("# 猪猪产品毒舌官评审报告\n\n");
+        builder.append("> 评审来源：").append(providerLabel(execution)).append("\n\n");
         builder.append("## 1. 产品决策区\n\n");
         builder.append("- 决策结论：").append(toDecisionLabel(report.getGoDecision())).append("\n");
         builder.append("- 一句话结论：").append(report.getOneLineVerdict()).append("\n");
@@ -335,6 +396,16 @@ public class ReviewServiceImpl implements ReviewService {
         builder.append("吐槽强度：").append(roastLevel).append("\n\n");
         builder.append("原始输入摘要：").append(buildSummary(content)).append("\n");
         return builder.toString();
+    }
+
+    private String providerLabel(AiProvider.ProviderExecution execution) {
+        if (execution.fallbackUsed()) {
+            return "Fallback / " + execution.providerName() + " / " + execution.modelName();
+        }
+        if ("mock".equalsIgnoreCase(execution.providerName())) {
+            return "Mock / " + execution.modelName();
+        }
+        return execution.providerName() + " / " + execution.modelName();
     }
 
     private String toDecisionLabel(String decision) {

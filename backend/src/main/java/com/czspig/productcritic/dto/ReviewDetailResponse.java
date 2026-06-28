@@ -15,6 +15,9 @@ public class ReviewDetailResponse {
     private String reportMarkdown;
     private String status;
     private String errorMessage;
+    private String providerName;
+    private String modelName;
+    private Boolean fallbackUsed;
     private String createdAt;
 
     public Long getId() {
@@ -119,6 +122,30 @@ public class ReviewDetailResponse {
 
     public void setErrorMessage(String errorMessage) {
         this.errorMessage = errorMessage;
+    }
+
+    public String getProviderName() {
+        return providerName;
+    }
+
+    public void setProviderName(String providerName) {
+        this.providerName = providerName;
+    }
+
+    public String getModelName() {
+        return modelName;
+    }
+
+    public void setModelName(String modelName) {
+        this.modelName = modelName;
+    }
+
+    public Boolean getFallbackUsed() {
+        return fallbackUsed;
+    }
+
+    public void setFallbackUsed(Boolean fallbackUsed) {
+        this.fallbackUsed = fallbackUsed;
     }
 
     public String getCreatedAt() {

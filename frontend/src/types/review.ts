@@ -45,6 +45,9 @@ export interface ReviewDetailResponse {
   reportMarkdown: string;
   status: ReviewStatus;
   errorMessage?: string | null;
+  providerName?: string;
+  modelName?: string;
+  fallbackUsed?: boolean;
   createdAt: string;
 }
 

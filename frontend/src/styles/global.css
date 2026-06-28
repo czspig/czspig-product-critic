@@ -423,7 +423,8 @@ h3 {
 
 .stamp-label,
 .report-stamps span,
-.decision-stamp {
+.decision-stamp,
+.provider-stamp {
   display: inline-flex;
   align-items: center;
   min-height: 26px;
@@ -451,6 +452,12 @@ h3 {
 .decision-stamp--pause {
   border-color: var(--danger);
   color: var(--danger);
+}
+
+.provider-stamp {
+  border-color: var(--success);
+  color: var(--success);
+  transform: rotate(1deg);
 }
 
 .decision-reason,

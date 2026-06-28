@@ -6,6 +6,7 @@
           <span>产品决策区</span>
           <span>{{ modeLabels[review.mode] }}</span>
           <span class="decision-stamp" :class="`decision-stamp--${goDecision.toLowerCase()}`">{{ goDecisionLabel }}</span>
+          <span v-if="providerBadge" class="provider-stamp">{{ providerBadge }}</span>
         </div>
         <p class="eyebrow">PM 评审纪要 / {{ review.createdAt }}</p>
         <h1>{{ review.oneLineVerdict }}</h1>
@@ -199,6 +200,15 @@ const goDecisionReason = computed(
 );
 const successMetric = computed(() => report.value?.minimumBuildVersion?.successMetric || '');
 const validationPlan = computed(() => report.value?.minimumBuildVersion?.validationPlan ?? []);
+const providerBadge = computed(() => {
+  if (!props.review.providerName) {
+    return '';
+  }
+  if (props.review.fallbackUsed) {
+    return `Fallback: ${props.review.providerName}`;
+  }
+  return props.review.providerName === 'mock' ? 'Mock 评审' : props.review.providerName;
+});
 
 const decisionLabels = {
   CONTINUE: '建议继续',
