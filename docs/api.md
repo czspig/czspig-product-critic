@@ -94,9 +94,21 @@ X-Session-Id: local-test-session
     "mode": "SHARP_PM",
     "roastLevel": 2,
     "oneLineVerdict": "这个想法有场景，但现在还像功能清单，不像一个真正的产品切口。",
+    "goDecision": "CONTINUE",
+    "goDecisionReason": "方向值得继续，但必须先收缩到一个高频核心场景。",
     "beatScore": 72,
     "positioningScore": 68,
-    "report": {},
+    "report": {
+      "goDecision": "CONTINUE",
+      "goDecisionReason": "方向值得继续，但必须先收缩到一个高频核心场景。",
+      "minimumBuildVersion": {
+        "goal": "验证核心闭环",
+        "coreFeatures": [],
+        "excludedFeatures": [],
+        "successMetric": "至少 10 个目标用户完成提交，其中 5 人愿意复制开发 Prompt。",
+        "validationPlan": []
+      }
+    },
     "reportMarkdown": "...",
     "status": "SUCCESS",
     "errorMessage": null,
@@ -152,6 +164,10 @@ X-Session-Id: local-test-session
 - 毒打指数
 - 产品定位评分
 - 结构化报告 `report`
+  - `goDecision`：`CONTINUE` / `PIVOT` / `PAUSE`
+  - `goDecisionReason`：是否建议继续做的理由
+  - `minimumBuildVersion.successMetric`：最小可开发版本成功指标
+  - `minimumBuildVersion.validationPlan`：最小验证计划
 - JSON 字符串 `reportJson`
 - Markdown 报告 `reportMarkdown`
 - 状态
@@ -186,3 +202,15 @@ curl -H "X-Session-Id: local-test-session" "http://localhost:8080/api/reviews?pa
 ```bash
 curl -H "X-Session-Id: local-test-session" http://localhost:8080/api/reviews/1
 ```
+
+## 6. 人工评测
+
+完整人工评测说明见：[人工评测说明](eval.md)。
+
+下面保留 3 个核心样例，便于快速检查报告是否有真实产品判断，而不是模板化总结。
+
+| 样例 | 输入 | 期望观察 |
+| --- | --- | --- |
+| 校园搭子小程序 | 我想做一个校园搭子小程序，支持饭搭子、学习搭子、运动搭子匹配，还有校园吐槽广场。 | 应指出范围过大、冷启动和社区冗余风险，`goDecision` 倾向 `PAUSE` 或 `PIVOT`。 |
+| AI 产品评审工具 | 我想做一个 AI 产品评审工具，用户输入产品想法后，系统输出伪需求风险、MVP 范围和给 Cursor 的开发 Prompt。 | 应识别目标用户和闭环较清晰，建议收缩报告模块，`goDecision` 倾向 `CONTINUE`。 |
+| 甲方校园服务小程序 | 甲方想做一个校园服务小程序，包含活动报名、帖子社区、公告轮播、用户管理、数据统计、举报审核和移动业务宣传。 | 应强调交付边界、验收模糊和范围蔓延，`goDecision` 倾向 `PIVOT`。 |

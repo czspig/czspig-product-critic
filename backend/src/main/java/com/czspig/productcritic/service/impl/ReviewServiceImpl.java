@@ -36,7 +36,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ReviewServiceImpl implements ReviewService {
 
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-    private static final String PROMPT_VERSION = "mvp-v1";
+    private static final String PROMPT_VERSION = "p2-review-quality-v1";
 
     private final ReviewRecordMapper reviewRecordMapper;
     private final AiCallLogMapper aiCallLogMapper;
@@ -311,25 +311,38 @@ public class ReviewServiceImpl implements ReviewService {
             ReviewReportDto report) {
         StringBuilder builder = new StringBuilder();
         builder.append("# 猪猪产品毒舌官评审报告\n\n");
-        builder.append("## 1. 一句话评价\n\n").append(report.getOneLineVerdict()).append("\n\n");
-        builder.append("## 2. 毒打指数\n\n").append(report.getBeatScore()).append("/100\n\n");
-        builder.append("## 3. 产品定位评分\n\n").append(report.getPositioningScore()).append("/100\n\n");
-        builder.append("## 4. 用户痛点分析\n\n").append(report.getPainPointAnalysis()).append("\n\n");
-        appendList(builder, "## 5. 伪需求风险", report.getFakeDemandRisks());
-        appendList(builder, "## 6. 功能冗余检查", report.getFeatureRedundancyCheck());
-        appendList(builder, "## 7. 冷启动问题", report.getColdStartProblems());
-        appendList(builder, "## 8. MVP 改造建议", report.getMvpSuggestions());
-        builder.append("## 9. 最小可开发版本\n\n");
+        builder.append("## 1. 产品决策区\n\n");
+        builder.append("- 决策结论：").append(toDecisionLabel(report.getGoDecision())).append("\n");
+        builder.append("- 一句话结论：").append(report.getOneLineVerdict()).append("\n");
+        builder.append("- 决策原因：").append(report.getGoDecisionReason()).append("\n");
+        builder.append("- 毒打指数：").append(report.getBeatScore()).append("/100\n");
+        builder.append("- 产品定位评分：").append(report.getPositioningScore()).append("/100\n");
+        builder.append("- 成功指标：").append(report.getMinimumBuildVersion().getSuccessMetric()).append("\n\n");
+        builder.append("## 2. 用户痛点分析\n\n").append(report.getPainPointAnalysis()).append("\n\n");
+        appendList(builder, "## 3. 伪需求风险", report.getFakeDemandRisks());
+        appendList(builder, "## 4. 功能冗余检查", report.getFeatureRedundancyCheck());
+        appendList(builder, "## 5. 冷启动问题", report.getColdStartProblems());
+        appendList(builder, "## 6. MVP 改造建议", report.getMvpSuggestions());
+        builder.append("## 7. 最小可开发版本\n\n");
         builder.append("目标：").append(report.getMinimumBuildVersion().getGoal()).append("\n\n");
         appendList(builder, "核心功能", report.getMinimumBuildVersion().getCoreFeatures());
         appendList(builder, "暂不实现", report.getMinimumBuildVersion().getExcludedFeatures());
-        builder.append("## 10. 给 Codex/Cursor 的开发 Prompt\n\n");
+        appendList(builder, "## 8. 验证计划", report.getMinimumBuildVersion().getValidationPlan());
+        builder.append("## 9. Codex/Cursor 开发 Prompt\n\n");
         builder.append("```markdown\n").append(report.getDeveloperPrompt()).append("\n```\n\n");
         builder.append("---\n\n");
         builder.append("评审模式：").append(mode.name()).append("\n\n");
         builder.append("吐槽强度：").append(roastLevel).append("\n\n");
         builder.append("原始输入摘要：").append(buildSummary(content)).append("\n");
         return builder.toString();
+    }
+
+    private String toDecisionLabel(String decision) {
+        return switch (decision) {
+            case "PIVOT" -> "建议调整方向";
+            case "PAUSE" -> "建议暂缓";
+            default -> "建议继续";
+        };
     }
 
     private void appendList(StringBuilder builder, String title, List<String> values) {

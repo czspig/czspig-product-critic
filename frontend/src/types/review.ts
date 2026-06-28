@@ -1,5 +1,6 @@
 export type ReviewMode = 'MENTOR' | 'SHARP_PM' | 'CLIENT';
 export type ReviewStatus = 'PENDING' | 'SUCCESS' | 'FAILED';
+export type GoDecision = 'CONTINUE' | 'PIVOT' | 'PAUSE';
 
 export interface CreateReviewPayload {
   content: string;
@@ -11,10 +12,14 @@ export interface MinimumBuildVersion {
   goal: string;
   coreFeatures: string[];
   excludedFeatures: string[];
+  successMetric?: string;
+  validationPlan?: string[];
 }
 
 export interface ReviewReport {
   oneLineVerdict: string;
+  goDecision?: GoDecision;
+  goDecisionReason?: string;
   beatScore: number;
   positioningScore: number;
   painPointAnalysis: string;

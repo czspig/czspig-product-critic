@@ -6,6 +6,8 @@ import java.util.List;
 public class ReviewReportDto {
 
     private String oneLineVerdict;
+    private String goDecision;
+    private String goDecisionReason;
     private Integer beatScore;
     private Integer positioningScore;
     private String painPointAnalysis;
@@ -22,6 +24,22 @@ public class ReviewReportDto {
 
     public void setOneLineVerdict(String oneLineVerdict) {
         this.oneLineVerdict = oneLineVerdict;
+    }
+
+    public String getGoDecision() {
+        return goDecision;
+    }
+
+    public void setGoDecision(String goDecision) {
+        this.goDecision = goDecision;
+    }
+
+    public String getGoDecisionReason() {
+        return goDecisionReason;
+    }
+
+    public void setGoDecisionReason(String goDecisionReason) {
+        this.goDecisionReason = goDecisionReason;
     }
 
     public Integer getBeatScore() {
@@ -101,6 +119,8 @@ public class ReviewReportDto {
         private String goal;
         private List<String> coreFeatures = new ArrayList<>();
         private List<String> excludedFeatures = new ArrayList<>();
+        private String successMetric;
+        private List<String> validationPlan = new ArrayList<>();
 
         public String getGoal() {
             return goal;
@@ -124,6 +144,22 @@ public class ReviewReportDto {
 
         public void setExcludedFeatures(List<String> excludedFeatures) {
             this.excludedFeatures = excludedFeatures;
+        }
+
+        public String getSuccessMetric() {
+            return successMetric;
+        }
+
+        public void setSuccessMetric(String successMetric) {
+            this.successMetric = successMetric;
+        }
+
+        public List<String> getValidationPlan() {
+            return validationPlan;
+        }
+
+        public void setValidationPlan(List<String> validationPlan) {
+            this.validationPlan = validationPlan;
         }
     }
 }

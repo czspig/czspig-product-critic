@@ -4,27 +4,25 @@
 
 一个“犀利但鼓励”的 AI 产品经理评审 Agent。MVP 闭环是：输入产品想法，生成结构化评审报告，保存历史，查看详情，复制开发 Prompt，导出 Markdown。
 
-## 当前能力
-
-- 后端：Spring Boot 3、Java 17+、MyBatis Plus、MySQL
-- 前端：Vue 3、Vite、TypeScript、Pinia、Vue Router
-- AI：DeepSeek Provider + Mock Provider 兜底
-- 输出：一句话评价、毒打指数、定位评分、痛点分析、伪需求风险、功能冗余、冷启动问题、MVP 建议、最小可开发版本、开发 Prompt
-- 历史：匿名 `X-Session-Id` 隔离历史记录
-- 导出：前端支持复制完整报告、复制开发 Prompt、下载 Markdown
-
 第一版不实现完整登录、支付、分享链接、复杂管理后台、多 Agent、RAG 和自动部署。
 
-## 目录
+## 技术栈
+
+- 后端：Spring Boot 3、Java 17、MyBatis Plus、MySQL
+- 前端：Vue 3、Vite、TypeScript、Pinia、Vue Router
+- AI：DeepSeek Provider + Mock Provider 兜底
+- 构建：后端优先使用 Maven Wrapper，前端统一使用 pnpm
+
+## 项目结构
 
 ```text
 backend/   Spring Boot API
 frontend/  Vue 3 Web App
 db/        MySQL 初始化脚本
-docs/      API、数据库、部署文档
+docs/      API、部署、评测和数据库文档
 ```
 
-## 初始化数据库
+## 数据库初始化
 
 先确保本机 MySQL 可用，然后执行：
 
@@ -32,7 +30,7 @@ docs/      API、数据库、部署文档
 mysql -u root -p < db/schema.sql
 ```
 
-默认数据库名：`czspig_product_critic`
+默认数据库名：`czspig_product_critic`。
 
 ## 后端配置
 
@@ -51,7 +49,7 @@ mysql -u root -p < db/schema.sql
 | `DEEPSEEK_BASE_URL` | `https://api.deepseek.com` | DeepSeek OpenAI 兼容地址 |
 | `DEEPSEEK_MODEL` | `deepseek-v4-flash` | 默认模型 |
 
-可参考：[application-example.yml](backend/src/main/resources/application-example.yml)
+可参考：[application-example.yml](backend/src/main/resources/application-example.yml)。不要把真实 API Key 或数据库密码提交到仓库。
 
 Provider 选择规则：
 
@@ -61,9 +59,18 @@ Provider 选择规则：
 
 ## 启动后端
 
+Linux / macOS：
+
 ```bash
 cd backend
-mvn spring-boot:run
+./mvnw spring-boot:run
+```
+
+Windows PowerShell：
+
+```powershell
+cd backend
+.\mvnw.cmd spring-boot:run
 ```
 
 健康检查：
@@ -72,26 +79,42 @@ mvn spring-boot:run
 curl http://localhost:8080/api/health
 ```
 
-当前机器如果没有 Maven，可以用 IntelliJ IDEA 导入 [pom.xml](backend/pom.xml) 后启动 `ProductCriticApplication`。
+后端构建：
+
+```bash
+cd backend
+./mvnw -q -DskipTests package
+```
+
+Windows PowerShell：
+
+```powershell
+cd backend
+.\mvnw.cmd -q -DskipTests package
+```
 
 ## 启动前端
+
+本项目统一使用 pnpm：
 
 ```bash
 cd frontend
 pnpm install
-pnpm run dev
+pnpm dev
 ```
 
-默认访问：`http://127.0.0.1:5173`
+默认访问：`http://127.0.0.1:5173`。
 
 前端开发服务器已配置 `/api` 代理到 `http://localhost:8080`。
 
-构建：
+前端构建：
 
 ```bash
 cd frontend
-pnpm run build
+pnpm build
 ```
+
+不推荐混用 npm/yarn。Windows PowerShell 如果遇到 `npm.ps1` 执行策略问题，可以使用 `npm.cmd run build`，但本项目仍建议用 pnpm。
 
 ## 文档
 
@@ -99,6 +122,41 @@ pnpm run build
 - [数据库设计](docs/database-schema.md)
 - [部署说明](docs/deploy.md)
 - [产品与架构说明](docs/product-architecture.md)
+- [人工评测说明](docs/eval.md)
+- [上线前检查清单](docs/release-checklist.md)
+
+## 常见问题
+
+### 没有配置 DeepSeek API Key 会怎样？
+
+默认 `APP_AI_PROVIDER=auto` 且 `APP_AI_FALLBACK_TO_MOCK=true`。没有 `DEEPSEEK_API_KEY` 时会使用 Mock Provider，便于本地开发和前端联调。
+
+### API Key 放在哪里？
+
+只放在服务器环境变量、本地未提交配置或部署平台密钥管理中。不要写入前端代码、Git 仓库、数据库或日志。
+
+### 为什么优先使用 Maven Wrapper？
+
+这样新机器不需要全局安装 Maven，也能通过 `./mvnw` 或 `.\mvnw.cmd` 构建后端。首次执行会下载 Maven 发行包。
+
+## GitHub 提交流程
+
+1. 运行前端构建：`cd frontend && pnpm build`
+2. 运行后端构建：`cd backend && ./mvnw -q -DskipTests package`
+3. 检查敏感信息：确认没有真实 API Key、数据库密码、`.env`、构建产物。
+4. 查看变更：`git status`、`git diff`
+5. 提交：`git add ... && git commit -m "prepare release checklist and deployment docs"`
+6. 推送到 GitHub 后，按 [上线前检查清单](docs/release-checklist.md) 做手动验收。
+
+## 阿里云部署前准备
+
+- 准备 JDK 17、MySQL 8、Nginx、Node.js 20+、pnpm。
+- 初始化数据库并创建最小权限 MySQL 用户。
+- 在服务器环境变量中配置 `MYSQL_URL`、`MYSQL_USERNAME`、`MYSQL_PASSWORD`、`DEEPSEEK_API_KEY`。
+- 构建后端 jar 和前端 `dist`。
+- 配置 Nginx：前端静态文件走 `/`，后端 API 反向代理到 `127.0.0.1:8080`。
+- 放行安全组端口：`80/443`，仅在必要时临时开放 `8080`。
+- 上线前执行 [上线前检查清单](docs/release-checklist.md)。
 
 ## 安全边界
 

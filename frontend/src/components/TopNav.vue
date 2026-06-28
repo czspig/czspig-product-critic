@@ -1,7 +1,7 @@
 <template>
   <header class="top-nav">
     <RouterLink class="brand" to="/" aria-label="返回首页">
-      <span class="brand-mark">猪</span>
+      <span class="brand-mark"><PixelPig size="small" pose="badge" /></span>
       <span class="brand-text">猪猪产品毒舌官</span>
     </RouterLink>
 
@@ -26,4 +26,6 @@
 <script setup lang="ts">
 import { FilePenLine, History, UserRound } from '@lucide/vue';
 import { RouterLink } from 'vue-router';
+
+import PixelPig from '@/components/PixelPig.vue';
 </script>

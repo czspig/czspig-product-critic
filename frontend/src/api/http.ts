@@ -36,9 +36,17 @@ export function toErrorMessage(error: unknown) {
   }
   if (axios.isAxiosError(error)) {
     const data = error.response?.data as Partial<ApiResponse<unknown>> | undefined;
-    return data?.message || error.message || '请求失败，请稍后再试';
+    console.error('Review API request failed', {
+      message: error.message,
+      status: error.response?.status,
+      code: data?.code,
+      url: error.config?.url,
+      method: error.config?.method,
+    });
+    return data?.message || '提供评审服务时暂时遇到问题，请稍后重试。';
   }
   if (error instanceof Error) {
+    console.error('Review request failed', error);
     return error.message;
   }
   return '请求失败，请稍后再试';

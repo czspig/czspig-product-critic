@@ -10,7 +10,14 @@ out/
 .env.*
 !.env.example
 application-local.yml
+application-dev.yml
 application-*.local.yml
+.mvn/wrapper/apache-maven-*/
+.mvn/wrapper/apache-maven-*.zip
+.mvn/wrapper/apache-maven-*.tar.gz
+backend/.mvn/wrapper/apache-maven-*/
+backend/.mvn/wrapper/apache-maven-*.zip
+backend/.mvn/wrapper/apache-maven-*.tar.gz
 
 logs/
 *.log

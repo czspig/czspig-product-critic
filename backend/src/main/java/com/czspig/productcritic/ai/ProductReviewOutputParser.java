@@ -28,6 +28,8 @@ public class ProductReviewOutputParser {
             throw new BizException(ErrorCode.AI_PROVIDER_ERROR, "评审报告为空");
         }
         requireText(report.getOneLineVerdict(), "一句话评价不能为空");
+        requireGoDecision(report.getGoDecision());
+        requireText(report.getGoDecisionReason(), "是否继续做的理由不能为空");
         requireScore(report.getBeatScore(), "毒打指数");
         requireScore(report.getPositioningScore(), "产品定位评分");
         requireText(report.getPainPointAnalysis(), "用户痛点分析不能为空");
@@ -41,6 +43,8 @@ public class ProductReviewOutputParser {
         requireText(report.getMinimumBuildVersion().getGoal(), "最小可开发版本目标不能为空");
         requireList(report.getMinimumBuildVersion().getCoreFeatures(), "最小可开发版本核心功能不能为空");
         requireList(report.getMinimumBuildVersion().getExcludedFeatures(), "最小可开发版本排除功能不能为空");
+        requireText(report.getMinimumBuildVersion().getSuccessMetric(), "最小可开发版本成功指标不能为空");
+        requireList(report.getMinimumBuildVersion().getValidationPlan(), "最小可开发版本验证计划不能为空");
         requireText(report.getDeveloperPrompt(), "开发 Prompt 不能为空");
     }
 
@@ -53,6 +57,12 @@ public class ProductReviewOutputParser {
     private void requireScore(Integer value, String fieldName) {
         if (value == null || value < 0 || value > 100) {
             throw new BizException(ErrorCode.AI_PROVIDER_ERROR, fieldName + "必须在 0-100 之间");
+        }
+    }
+
+    private void requireGoDecision(String value) {
+        if (!"CONTINUE".equals(value) && !"PIVOT".equals(value) && !"PAUSE".equals(value)) {
+            throw new BizException(ErrorCode.AI_PROVIDER_ERROR, "是否继续做必须是 CONTINUE、PIVOT 或 PAUSE");
         }
     }
 
