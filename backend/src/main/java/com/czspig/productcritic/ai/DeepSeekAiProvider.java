@@ -70,7 +70,7 @@ public class DeepSeekAiProvider implements AiProvider {
         Map<String, Object> requestBody = Map.of(
                 "model", properties.getModel(),
                 "messages", List.of(
-                        Map.of("role", "system", "content", "你必须输出合法 JSON，不要使用 Markdown 代码块。"),
+                        Map.of("role", "system", "content", "你必须输出合法 JSON 对象，不要使用 Markdown 代码块。"),
                         Map.of("role", "user", "content", prompt)
                 ),
                 "response_format", Map.of("type", "json_object"),
@@ -110,11 +110,15 @@ public class DeepSeekAiProvider implements AiProvider {
 
     private String buildRepairPrompt(String invalidOutput) {
         return """
-                请把下面内容修复为合法 JSON 对象，只输出 JSON，不要输出解释文字。
+                请把下面内容修复为合法 JSON 对象，只输出 JSON，不要输出解释文字或 Markdown。
+                必须包含全部字段，字段名不能改；缺失字段请根据已有内容补合理兜底，不要留空。
 
                 必须符合这个结构：
                 {
                   "oneLineVerdict": "string",
+                  "reviewTargetType": "NEW_IDEA | MATURE_PRODUCT | CLIENT_REQUIREMENT | UNCLEAR",
+                  "goDecision": "CONTINUE | PIVOT | PAUSE",
+                  "goDecisionReason": "string",
                   "beatScore": 0,
                   "positioningScore": 0,
                   "painPointAnalysis": "string",
@@ -125,10 +129,18 @@ public class DeepSeekAiProvider implements AiProvider {
                   "minimumBuildVersion": {
                     "goal": "string",
                     "coreFeatures": ["string"],
-                    "excludedFeatures": ["string"]
+                    "excludedFeatures": ["string"],
+                    "successMetric": "string",
+                    "validationPlan": ["string"]
                   },
                   "developerPrompt": "string"
                 }
+
+                字段规则：
+                - beatScore 和 positioningScore 必须是 0-100 整数。
+                - 数组字段至少 1 项，最好 2-4 项。
+                - reviewTargetType 和 goDecision 只能使用枚举值。
+                - developerPrompt 必须可直接复制给 Codex/Cursor。
 
                 待修复内容：
                 <invalid_output>

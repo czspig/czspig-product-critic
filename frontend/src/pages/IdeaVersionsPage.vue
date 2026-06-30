@@ -31,8 +31,8 @@
         >
           <span>V{{ version.versionNo }}</span>
           <div>
-            <strong>{{ version.oneLineVerdict }}</strong>
-            <p>{{ version.createdAt }}</p>
+            <strong>{{ version.oneLineVerdict || '暂无一句话评价' }}</strong>
+            <p>{{ version.createdAt || '暂无时间' }}</p>
           </div>
         </RouterLink>
       </section>
@@ -56,30 +56,30 @@
                 </RouterLink>
               </td>
               <td>
-                <span>毒打 {{ version.beatScore }}/100</span>
+                <span>毒打 {{ version.beatScore ?? 0 }}/100</span>
                 <small>{{ scoreDelta(version.beatScore, previousOf(version)?.beatScore, 'beat') }}</small>
-                <span>定位 {{ version.positioningScore }}/100</span>
+                <span>定位 {{ version.positioningScore ?? 0 }}/100</span>
                 <small>{{ scoreDelta(version.positioningScore, previousOf(version)?.positioningScore, 'positioning') }}</small>
               </td>
               <td>
                 <strong>{{ decisionLabels[version.goDecision || 'CONTINUE'] }}</strong>
-                <p>{{ version.goDecisionReason }}</p>
+                <p>{{ version.goDecisionReason || '暂无决策原因' }}</p>
               </td>
               <td>
-                <p>{{ version.minimumBuildGoal }}</p>
+                <p>{{ version.minimumBuildGoal || '暂无最小版本目标' }}</p>
                 <strong>核心功能</strong>
                 <ul>
-                  <li v-for="item in version.coreFeatures" :key="item">{{ item }}</li>
+                  <li v-for="item in nonEmpty(version.coreFeatures)" :key="item">{{ item }}</li>
                 </ul>
                 <strong>暂不做</strong>
                 <ul>
-                  <li v-for="item in version.excludedFeatures" :key="item">{{ item }}</li>
+                  <li v-for="item in nonEmpty(version.excludedFeatures)" :key="item">{{ item }}</li>
                 </ul>
               </td>
               <td>
-                <p v-if="version.successMetric">{{ version.successMetric }}</p>
+                <p>{{ version.successMetric || '暂无成功指标' }}</p>
                 <ul>
-                  <li v-for="item in version.validationPlan" :key="item">{{ item }}</li>
+                  <li v-for="item in nonEmpty(version.validationPlan)" :key="item">{{ item }}</li>
                 </ul>
               </td>
             </tr>
@@ -121,8 +121,11 @@ function previousOf(version: ReviewVersionItem) {
   return index > 0 ? versions[index - 1] : null;
 }
 
-function scoreDelta(current: number, previous: number | undefined, type: 'beat' | 'positioning') {
-  if (previous === undefined) {
+function scoreDelta(current: number | undefined, previous: number | undefined, type: 'beat' | 'positioning') {
+  if (current === undefined || current === null) {
+    return '暂无分数';
+  }
+  if (previous === undefined || previous === null) {
     return '首版基线';
   }
   const delta = current - previous;
@@ -134,6 +137,10 @@ function scoreDelta(current: number, previous: number | undefined, type: 'beat' 
     ? delta < 0 ? '风险下降' : '风险上升'
     : delta > 0 ? '更清晰' : '更模糊';
   return `${prefix}${delta}，${meaning}`;
+}
+
+function nonEmpty(items: string[] | undefined) {
+  return items && items.length > 0 ? items : ['暂无'];
 }
 
 onMounted(loadGroup);

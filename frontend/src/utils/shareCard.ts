@@ -26,7 +26,7 @@ export function toShareCardData(review: ReviewDetailResponse): ShareCardData {
     decision: decisionLabel(review.report?.goDecision),
     beatScore: review.beatScore || 0,
     positioningScore: review.positioningScore || 0,
-    oneLineVerdict: review.oneLineVerdict || '这份产品想法需要继续打磨。',
+    oneLineVerdict: review.oneLineVerdict || '这份产品想法还需要继续打磨。',
     successMetric: review.report?.minimumBuildVersion?.successMetric || '先用最小实验验证用户是否愿意持续使用。',
     versionLabel: review.versionNo ? `V${review.versionNo}` : '',
   };
@@ -34,7 +34,7 @@ export function toShareCardData(review: ReviewDetailResponse): ShareCardData {
 
 export function buildShareCardText(review: ReviewDetailResponse) {
   const data = toShareCardData(review);
-  return `【猪猪产品毒舌官｜产品体检卡】
+  return `【猪猪产品毒舌官·产品体检卡】
 产品想法：${data.title}
 决策结论：${data.decision}
 毒打指数：${data.beatScore}/100
