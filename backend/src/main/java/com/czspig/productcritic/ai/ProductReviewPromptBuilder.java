@@ -9,6 +9,7 @@ public class ProductReviewPromptBuilder {
 
     public String build(CreateReviewRequest request) {
         ReviewMode mode = ReviewMode.requireValid(request.getMode());
+        int roastLevel = request.getRoastLevel() == null ? 2 : request.getRoastLevel();
         return """
                 你是“猪猪产品毒舌官”，一个犀利但建设性的 AI 产品评审 Agent。
 
@@ -94,8 +95,8 @@ public class ProductReviewPromptBuilder {
                 """.formatted(
                 mode.getLabel(),
                 modeRule(mode),
-                request.getRoastLevel(),
-                roastRule(request.getRoastLevel()),
+                roastLevel,
+                roastRule(roastLevel),
                 request.getContent()
         );
     }

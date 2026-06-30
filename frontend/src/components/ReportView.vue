@@ -52,6 +52,9 @@
         </aside>
 
         <div class="report-body">
+          <ScoreOverviewCard :review="review" />
+          <DimensionScoreList :review="review" />
+
           <section id="pain" class="report-section report-section--lead">
             <div class="section-title">
               <span>01</span>
@@ -226,7 +229,9 @@ import { RouterLink, useRouter } from 'vue-router';
 import { ArrowLeft, CircleAlert, ClipboardList, Copy, Download, GitCompare, ImageDown, PackageCheck, RefreshCw, X } from '@lucide/vue';
 
 import ListBlock from '@/components/ListBlock.vue';
+import DimensionScoreList from '@/components/DimensionScoreList.vue';
 import PixelPig from '@/components/PixelPig.vue';
+import ScoreOverviewCard from '@/components/ScoreOverviewCard.vue';
 import ShareCardModal from '@/components/share/ShareCardModal.vue';
 import type { ReviewDetailResponse } from '@/types/review';
 import { copyText } from '@/utils/clipboard';

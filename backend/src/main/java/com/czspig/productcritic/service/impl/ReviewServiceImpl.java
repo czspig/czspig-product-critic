@@ -70,11 +70,12 @@ public class ReviewServiceImpl implements ReviewService {
         ReviewMode mode = ReviewMode.requireValid(request.getMode());
         String safeContent = normalizeContent(request.getContent());
         String safeSessionId = normalizeSessionId(sessionId);
+        int safeRoastLevel = normalizeRoastLevel(request.getRoastLevel());
 
         CreateReviewRequest normalizedRequest = new CreateReviewRequest();
         normalizedRequest.setContent(safeContent);
         normalizedRequest.setMode(mode.name());
-        normalizedRequest.setRoastLevel(request.getRoastLevel());
+        normalizedRequest.setRoastLevel(safeRoastLevel);
         normalizedRequest.setIdeaGroupId(request.getIdeaGroupId());
         normalizedRequest.setParentReviewId(request.getParentReviewId());
 
@@ -95,7 +96,7 @@ public class ReviewServiceImpl implements ReviewService {
         record.setInputSummary(buildSummary(safeContent));
         applyVersionFields(record, request, safeSessionId);
         record.setMode(mode.name());
-        record.setRoastLevel(request.getRoastLevel());
+        record.setRoastLevel(safeRoastLevel);
         record.setOneLineVerdict("AI 评审生成中");
         record.setBeatScore(0);
         record.setPositioningScore(0);
@@ -122,7 +123,7 @@ public class ReviewServiceImpl implements ReviewService {
             outputParser.validate(report);
 
             String reportJson = writeJson(report);
-            String reportMarkdown = renderMarkdown(safeContent, mode, request.getRoastLevel(), report, execution);
+            String reportMarkdown = renderMarkdown(safeContent, mode, safeRoastLevel, report, execution);
             LocalDateTime finishedAt = LocalDateTime.now();
             record.setOneLineVerdict(report.getOneLineVerdict());
             record.setBeatScore(report.getBeatScore());
@@ -481,6 +482,10 @@ public class ReviewServiceImpl implements ReviewService {
             throw new BizException(ErrorCode.VALIDATION_ERROR, "产品想法长度应为 10-5000 个字符");
         }
         return value;
+    }
+
+    private int normalizeRoastLevel(Integer roastLevel) {
+        return roastLevel == null ? 2 : roastLevel;
     }
 
     private String normalizeSessionId(String sessionId) {

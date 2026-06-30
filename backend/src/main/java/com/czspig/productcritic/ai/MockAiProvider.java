@@ -15,17 +15,18 @@ public class MockAiProvider implements AiProvider {
     @Override
     public ReviewReportDto review(CreateReviewRequest request, String prompt) {
         ReviewMode mode = ReviewMode.requireValid(request.getMode());
+        int roastLevel = request.getRoastLevel() == null ? 2 : request.getRoastLevel();
         String content = normalize(request.getContent());
         IdeaProfile profile = IdeaProfile.from(content);
 
         ReviewReportDto report = new ReviewReportDto();
         report.setReviewTargetType(profile.reviewTargetType());
         report.setGoDecision(profile.goDecision());
-        report.setBeatScore(score(profile.baseRisk() + request.getRoastLevel() * 4 + lengthRisk(content)));
+        report.setBeatScore(score(profile.baseRisk() + roastLevel * 4 + lengthRisk(content)));
         report.setPositioningScore(score(profile.baseClarity() + clarityBonus(content) - scopePenalty(content)));
-        report.setOneLineVerdict(oneLineVerdict(mode, request.getRoastLevel(), profile));
-        report.setGoDecisionReason(goDecisionReason(profile));
-        report.setPainPointAnalysis(painPointAnalysis(profile));
+        report.setOneLineVerdict(oneLineVerdict(mode, roastLevel, profile));
+        report.setGoDecisionReason(applyTone(roastLevel, goDecisionReason(profile)));
+        report.setPainPointAnalysis(applyTone(roastLevel, painPointAnalysis(profile)));
         report.setFakeDemandRisks(fakeDemandRisks(profile));
         report.setFeatureRedundancyCheck(featureRedundancyCheck(profile));
         report.setColdStartProblems(coldStartProblems(profile));
@@ -53,9 +54,9 @@ public class MockAiProvider implements AiProvider {
     }
 
     private String oneLineVerdict(ReviewMode mode, int roastLevel, IdeaProfile profile) {
-        String tone = mode == ReviewMode.MENTOR
+        String tone = mode == ReviewMode.MENTOR || roastLevel <= 1
                 ? "方向可以聊，但第一刀要砍得更窄："
-                : roastLevel >= 3 ? "别急着写代码，先把这个坑看清楚：" : "先收敛一下：";
+                : roastLevel >= 3 ? "地狱模式直说：别急着写代码，先把这个坑看清楚：" : "犀利模式先收敛一下：";
         return switch (profile.industry()) {
             case "campus_trade" -> tone + "校园二手交易不缺摊位，缺的是可信履约和供需密度，别把小程序做成空荡荡的跳蚤市场。";
             case "ai_resume" -> tone + "AI 简历优化的价值不在润色形容词，而在能不能让用户拿到更多面试回音。";
@@ -64,6 +65,16 @@ public class MockAiProvider implements AiProvider {
             case "client_requirement" -> "这是甲方需求，不是许愿池；先把验收边界钉死，再谈排期和报价。";
             default -> "输入信息还不够，像一张产品愿望便利贴，还没到能评审 MVP 的程度。";
         };
+    }
+
+    private String applyTone(int roastLevel, String text) {
+        if (roastLevel <= 1) {
+            return "温和模式提醒：" + text;
+        }
+        if (roastLevel >= 3) {
+            return "地狱模式直说：" + text + " 这不是否定你，是防止你把时间烧在一个没人买单的漂亮页面上。";
+        }
+        return "犀利模式判断：" + text;
     }
 
     private String goDecisionReason(IdeaProfile profile) {

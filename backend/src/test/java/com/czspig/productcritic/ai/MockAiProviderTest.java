@@ -47,11 +47,28 @@ class MockAiProviderTest {
         assertThat(mature.getReviewTargetType()).isEqualTo("MATURE_PRODUCT");
     }
 
+    @Test
+    void shouldApplyDifferentRoastTones() {
+        ReviewReportDto mild = provider.review(request("resume JD tool for job seekers", 1), "");
+        ReviewReportDto sharp = provider.review(request("resume JD tool for job seekers", 2), "");
+        ReviewReportDto hell = provider.review(request("resume JD tool for job seekers", 3), "");
+
+        assertThat(mild.getGoDecisionReason()).startsWith("温和模式提醒");
+        assertThat(sharp.getGoDecisionReason()).startsWith("犀利模式判断");
+        assertThat(hell.getGoDecisionReason()).startsWith("地狱模式直说");
+        assertThat(hell.getOneLineVerdict()).contains("地狱模式");
+        assertThat(hell.getBeatScore()).isGreaterThan(mild.getBeatScore());
+    }
+
     private CreateReviewRequest request(String content) {
+        return request(content, 2);
+    }
+
+    private CreateReviewRequest request(String content, int roastLevel) {
         CreateReviewRequest request = new CreateReviewRequest();
         request.setContent(content);
         request.setMode("SHARP_PM");
-        request.setRoastLevel(2);
+        request.setRoastLevel(roastLevel);
         return request;
     }
 }
