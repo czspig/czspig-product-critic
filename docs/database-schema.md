@@ -32,6 +32,9 @@
 | session_id | VARCHAR(128) | 匿名会话 ID |
 | input_content | MEDIUMTEXT | 用户原始输入 |
 | input_summary | VARCHAR(255) | 输入摘要 |
+| idea_group_id | VARCHAR(64) | 同一个产品想法的迭代组；旧数据为空时按自身 `id` 兜底 |
+| version_no | INT | 想法版本号，默认 1 |
+| parent_review_id | BIGINT | 当前版本基于哪一次评审生成，第一版为空 |
 | mode | VARCHAR(32) | `MENTOR` / `SHARP_PM` / `CLIENT` |
 | roast_level | TINYINT | 1 温和，2 正常，3 毒舌 |
 | one_line_verdict | VARCHAR(255) | 一句话评价 |
@@ -50,8 +53,29 @@
 索引：
 
 - `idx_review_records_session_created`
+- `idx_review_records_group_version`
+- `idx_review_records_parent_review_id`
 - `idx_review_records_user_created`
 - `idx_review_records_status`
+
+### 旧数据库升级 SQL
+
+如果本地或服务器已经初始化过旧版数据库，需要手动执行：
+
+```sql
+ALTER TABLE review_records
+  ADD COLUMN idea_group_id VARCHAR(64) NULL COMMENT '同一个产品想法的迭代组',
+  ADD COLUMN version_no INT NOT NULL DEFAULT 1 COMMENT '想法迭代版本号',
+  ADD COLUMN parent_review_id BIGINT NULL COMMENT '当前版本基于哪一次评审生成';
+
+CREATE INDEX idx_review_records_group_version
+  ON review_records (idea_group_id, version_no);
+
+CREATE INDEX idx_review_records_parent_review_id
+  ON review_records (parent_review_id);
+```
+
+旧数据没有 `idea_group_id` 时，后端会按该条记录自身 `id` 作为轻量兜底组 ID；新建 V1 会在插入后回填 `idea_group_id = id`。
 
 ## ai_call_logs
 

@@ -4,6 +4,7 @@ import type {
   CreateReviewPayload,
   PageResponse,
   ReviewDetailResponse,
+  ReviewGroupResponse,
   ReviewListItemResponse,
 } from '@/types/review';
 
@@ -21,5 +22,10 @@ export async function listReviews(page = 1, pageSize = 10) {
   const response = await http.get<ApiResponse<PageResponse<ReviewListItemResponse>>>('/reviews', {
     params: { page, pageSize },
   });
+  return unwrap(response.data);
+}
+
+export async function getReviewGroup(ideaGroupId: string) {
+  const response = await http.get<ApiResponse<ReviewGroupResponse>>(`/reviews/group/${encodeURIComponent(ideaGroupId)}`);
   return unwrap(response.data);
 }

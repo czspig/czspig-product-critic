@@ -34,7 +34,11 @@
         :to="{ name: 'review-detail', params: { id: item.id } }"
       >
         <div class="history-main">
-          <span class="status-pill" :class="item.status.toLowerCase()">{{ statusLabels[item.status] }}</span>
+          <div class="history-badges">
+            <span class="status-pill" :class="item.status.toLowerCase()">{{ statusLabels[item.status] }}</span>
+            <span class="status-pill version">V{{ item.versionNo || 1 }}</span>
+            <span v-if="item.groupVersionCount > 1" class="status-pill iterated">已迭代 {{ item.groupVersionCount }} 版</span>
+          </div>
           <h2>{{ item.inputSummary }}</h2>
           <p>{{ item.status === 'FAILED' ? item.errorMessage : item.oneLineVerdict }}</p>
         </div>

@@ -20,6 +20,7 @@ import com.czspig.productcritic.common.ReviewMode;
 import com.czspig.productcritic.common.ReviewStatus;
 import com.czspig.productcritic.dto.CreateReviewRequest;
 import com.czspig.productcritic.dto.ReviewDetailResponse;
+import com.czspig.productcritic.dto.ReviewGroupResponse;
 import com.czspig.productcritic.dto.ReviewListItemResponse;
 import com.czspig.productcritic.dto.ReviewReportDto;
 import com.czspig.productcritic.entity.AiCallLogEntity;
@@ -74,6 +75,8 @@ public class ReviewServiceImpl implements ReviewService {
         normalizedRequest.setContent(safeContent);
         normalizedRequest.setMode(mode.name());
         normalizedRequest.setRoastLevel(request.getRoastLevel());
+        normalizedRequest.setIdeaGroupId(request.getIdeaGroupId());
+        normalizedRequest.setParentReviewId(request.getParentReviewId());
 
         String prompt = promptBuilder.build(normalizedRequest);
         String promptHash = sha256(prompt);
@@ -90,6 +93,7 @@ public class ReviewServiceImpl implements ReviewService {
         record.setSessionId(safeSessionId);
         record.setInputContent(safeContent);
         record.setInputSummary(buildSummary(safeContent));
+        applyVersionFields(record, request, safeSessionId);
         record.setMode(mode.name());
         record.setRoastLevel(request.getRoastLevel());
         record.setOneLineVerdict("AI 评审生成中");
@@ -103,6 +107,7 @@ public class ReviewServiceImpl implements ReviewService {
         record.setCreatedAt(now);
         record.setUpdatedAt(now);
         reviewRecordMapper.insert(record);
+        ensureRecordGroupId(record);
 
         try {
             ReviewReportDto report = aiProvider.review(normalizedRequest, prompt);
@@ -174,6 +179,56 @@ public class ReviewServiceImpl implements ReviewService {
         return toDetailResponse(record, readReport(record.getReportJson()));
     }
 
+    @Override
+    public ReviewGroupResponse getReviewGroup(String ideaGroupId, String sessionId) {
+        String safeSessionId = normalizeSessionId(sessionId);
+        String safeGroupId = normalizeIdeaGroupId(ideaGroupId);
+        List<ReviewRecordEntity> records = reviewRecordMapper.selectList(new LambdaQueryWrapper<ReviewRecordEntity>()
+                .eq(ReviewRecordEntity::getSessionId, safeSessionId)
+                .eq(ReviewRecordEntity::getIdeaGroupId, safeGroupId)
+                .isNull(ReviewRecordEntity::getDeletedAt)
+                .orderByAsc(ReviewRecordEntity::getVersionNo)
+                .orderByAsc(ReviewRecordEntity::getCreatedAt));
+        if (records.isEmpty()) {
+            ReviewRecordEntity legacyRecord = findLegacyGroupRecord(safeGroupId, safeSessionId);
+            if (legacyRecord != null) {
+                records = List.of(legacyRecord);
+            }
+        }
+        if (records.isEmpty()) {
+            throw new BizException(ErrorCode.NOT_FOUND, "迭代版本不存在");
+        }
+
+        ReviewGroupResponse response = new ReviewGroupResponse();
+        response.setIdeaGroupId(safeGroupId);
+        response.setVersions(records.stream().map(this::toReviewVersionItem).toList());
+        return response;
+    }
+
+    private void applyVersionFields(ReviewRecordEntity record, CreateReviewRequest request, String sessionId) {
+        ReviewRecordEntity parent = findParentRecord(request.getParentReviewId(), sessionId);
+        if (parent != null) {
+            String parentGroupId = normalizeRecordGroupId(parent);
+            record.setIdeaGroupId(parentGroupId);
+            record.setParentReviewId(parent.getId());
+            record.setVersionNo(nextVersionNo(parentGroupId, sessionId, parent));
+            return;
+        }
+
+        String requestedGroupId = blankToNull(request.getIdeaGroupId());
+        if (requestedGroupId != null) {
+            String safeGroupId = normalizeIdeaGroupId(requestedGroupId);
+            record.setIdeaGroupId(safeGroupId);
+            record.setParentReviewId(null);
+            record.setVersionNo(nextVersionNo(safeGroupId, sessionId, null));
+            return;
+        }
+
+        record.setIdeaGroupId(null);
+        record.setParentReviewId(null);
+        record.setVersionNo(1);
+    }
+
     private void insertAiCallLog(
             ReviewRecordEntity record,
             String promptHash,
@@ -200,6 +255,101 @@ public class ReviewServiceImpl implements ReviewService {
         aiCallLogMapper.insert(log);
     }
 
+    private ReviewRecordEntity findParentRecord(Long parentReviewId, String sessionId) {
+        if (parentReviewId == null) {
+            return null;
+        }
+        if (parentReviewId <= 0) {
+            throw new BizException(ErrorCode.VALIDATION_ERROR, "parentReviewId 必须为正整数");
+        }
+        ReviewRecordEntity parent = reviewRecordMapper.selectById(parentReviewId);
+        if (parent == null || parent.getDeletedAt() != null || !sessionId.equals(parent.getSessionId())) {
+            throw new BizException(ErrorCode.NOT_FOUND, "父级评审记录不存在");
+        }
+        return parent;
+    }
+
+    private int nextVersionNo(String ideaGroupId, String sessionId, ReviewRecordEntity parent) {
+        ReviewRecordEntity latest = reviewRecordMapper.selectOne(new LambdaQueryWrapper<ReviewRecordEntity>()
+                .eq(ReviewRecordEntity::getSessionId, sessionId)
+                .eq(ReviewRecordEntity::getIdeaGroupId, ideaGroupId)
+                .isNull(ReviewRecordEntity::getDeletedAt)
+                .orderByDesc(ReviewRecordEntity::getVersionNo)
+                .last("LIMIT 1"));
+        int latestVersion = latest == null ? 0 : safeVersionNo(latest);
+        int parentVersion = parent == null ? 0 : safeVersionNo(parent);
+        return Math.max(latestVersion, parentVersion) + 1;
+    }
+
+    private void ensureRecordGroupId(ReviewRecordEntity record) {
+        if (record.getIdeaGroupId() != null && !record.getIdeaGroupId().isBlank()) {
+            return;
+        }
+        record.setIdeaGroupId(String.valueOf(record.getId()));
+        record.setUpdatedAt(LocalDateTime.now());
+        reviewRecordMapper.updateById(record);
+    }
+
+    private String normalizeRecordGroupId(ReviewRecordEntity record) {
+        if (record.getIdeaGroupId() != null && !record.getIdeaGroupId().isBlank()) {
+            return record.getIdeaGroupId();
+        }
+        return record.getId() == null ? "" : String.valueOf(record.getId());
+    }
+
+    private int safeVersionNo(ReviewRecordEntity record) {
+        return record.getVersionNo() == null || record.getVersionNo() <= 0 ? 1 : record.getVersionNo();
+    }
+
+    private int countGroupVersions(String ideaGroupId, String sessionId) {
+        if (ideaGroupId == null || ideaGroupId.isBlank()) {
+            return 1;
+        }
+        Long count = reviewRecordMapper.selectCount(new LambdaQueryWrapper<ReviewRecordEntity>()
+                .eq(ReviewRecordEntity::getSessionId, sessionId)
+                .eq(ReviewRecordEntity::getIdeaGroupId, ideaGroupId)
+                .isNull(ReviewRecordEntity::getDeletedAt));
+        int value = count == null ? 0 : count.intValue();
+        if (value > 0) {
+            return value;
+        }
+        return findLegacyGroupRecord(ideaGroupId, sessionId) == null ? 0 : 1;
+    }
+
+    private ReviewRecordEntity findLegacyGroupRecord(String ideaGroupId, String sessionId) {
+        try {
+            Long id = Long.valueOf(ideaGroupId);
+            ReviewRecordEntity record = reviewRecordMapper.selectById(id);
+            if (record == null || record.getDeletedAt() != null || !sessionId.equals(record.getSessionId())) {
+                return null;
+            }
+            return record;
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+    }
+
+    private ReviewGroupResponse.ReviewVersionItem toReviewVersionItem(ReviewRecordEntity record) {
+        ReviewReportDto report = readReport(record.getReportJson());
+        ReviewReportDto.MinimumBuildVersion minimum = report.getMinimumBuildVersion();
+        ReviewGroupResponse.ReviewVersionItem item = new ReviewGroupResponse.ReviewVersionItem();
+        item.setId(record.getId());
+        item.setVersionNo(safeVersionNo(record));
+        item.setParentReviewId(record.getParentReviewId());
+        item.setGoDecision(report.getGoDecision());
+        item.setGoDecisionReason(report.getGoDecisionReason());
+        item.setBeatScore(record.getBeatScore());
+        item.setPositioningScore(record.getPositioningScore());
+        item.setOneLineVerdict(record.getOneLineVerdict());
+        item.setSuccessMetric(minimum == null ? "" : minimum.getSuccessMetric());
+        item.setMinimumBuildGoal(minimum == null ? "" : minimum.getGoal());
+        item.setCoreFeatures(minimum == null ? List.of() : minimum.getCoreFeatures());
+        item.setExcludedFeatures(minimum == null ? List.of() : minimum.getExcludedFeatures());
+        item.setValidationPlan(minimum == null ? List.of() : minimum.getValidationPlan());
+        item.setCreatedAt(formatTime(record.getCreatedAt()));
+        return item;
+    }
+
     private ReviewDetailResponse toDetailResponse(ReviewRecordEntity record, ReviewReportDto report) {
         AiProvider.ProviderExecution execution = new AiProvider.ProviderExecution(
                 safeProviderName(),
@@ -213,10 +363,15 @@ public class ReviewServiceImpl implements ReviewService {
             ReviewRecordEntity record,
             ReviewReportDto report,
             AiProvider.ProviderExecution execution) {
+        String ideaGroupId = normalizeRecordGroupId(record);
         ReviewDetailResponse response = new ReviewDetailResponse();
         response.setId(record.getId());
         response.setInputContent(record.getInputContent());
         response.setInputSummary(record.getInputSummary());
+        response.setIdeaGroupId(ideaGroupId);
+        response.setVersionNo(safeVersionNo(record));
+        response.setParentReviewId(record.getParentReviewId());
+        response.setGroupVersionCount(countGroupVersions(ideaGroupId, record.getSessionId()));
         response.setMode(record.getMode());
         response.setRoastLevel(record.getRoastLevel());
         response.setOneLineVerdict(record.getOneLineVerdict());
@@ -235,9 +390,14 @@ public class ReviewServiceImpl implements ReviewService {
     }
 
     private ReviewListItemResponse toListItemResponse(ReviewRecordEntity record) {
+        String ideaGroupId = normalizeRecordGroupId(record);
         ReviewListItemResponse response = new ReviewListItemResponse();
         response.setId(record.getId());
         response.setInputSummary(record.getInputSummary());
+        response.setIdeaGroupId(ideaGroupId);
+        response.setVersionNo(safeVersionNo(record));
+        response.setParentReviewId(record.getParentReviewId());
+        response.setGroupVersionCount(countGroupVersions(ideaGroupId, record.getSessionId()));
         response.setMode(record.getMode());
         response.setRoastLevel(record.getRoastLevel());
         response.setOneLineVerdict(record.getOneLineVerdict());
@@ -331,6 +491,24 @@ public class ReviewServiceImpl implements ReviewService {
         return value;
     }
 
+    private String normalizeIdeaGroupId(String ideaGroupId) {
+        String value = ideaGroupId == null ? "" : ideaGroupId.trim();
+        if (value.isBlank()) {
+            throw new BizException(ErrorCode.VALIDATION_ERROR, "ideaGroupId 不能为空");
+        }
+        if (value.length() > 64) {
+            throw new BizException(ErrorCode.VALIDATION_ERROR, "ideaGroupId 不能超过 64 个字符");
+        }
+        if (!value.matches("[A-Za-z0-9_-]+")) {
+            throw new BizException(ErrorCode.VALIDATION_ERROR, "ideaGroupId 只能包含字母、数字、下划线或短横线");
+        }
+        return value;
+    }
+
+    private String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+
     private String buildSummary(String content) {
         String normalized = content.replaceAll("\\s+", " ").trim();
         if (normalized.length() <= 80) {
@@ -373,6 +551,7 @@ public class ReviewServiceImpl implements ReviewService {
         builder.append("# 猪猪产品毒舌官评审报告\n\n");
         builder.append("> 评审来源：").append(providerLabel(execution)).append("\n\n");
         builder.append("## 1. 产品决策区\n\n");
+        builder.append("- 评审对象：").append(toReviewTargetTypeLabel(report.getReviewTargetType())).append("\n");
         builder.append("- 决策结论：").append(toDecisionLabel(report.getGoDecision())).append("\n");
         builder.append("- 一句话结论：").append(report.getOneLineVerdict()).append("\n");
         builder.append("- 决策原因：").append(report.getGoDecisionReason()).append("\n");
@@ -413,6 +592,16 @@ public class ReviewServiceImpl implements ReviewService {
             case "PIVOT" -> "建议调整方向";
             case "PAUSE" -> "建议暂缓";
             default -> "建议继续";
+        };
+    }
+
+    private String toReviewTargetTypeLabel(String type) {
+        return switch (type == null ? "" : type) {
+            case "NEW_IDEA" -> "新产品想法";
+            case "MATURE_PRODUCT" -> "成熟产品复盘";
+            case "CLIENT_REQUIREMENT" -> "甲方需求";
+            case "UNCLEAR" -> "输入不清晰";
+            default -> "未识别";
         };
     }
 

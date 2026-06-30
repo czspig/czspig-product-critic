@@ -5,6 +5,8 @@
         <div class="report-stamps">
           <span>产品决策区</span>
           <span>{{ modeLabels[review.mode] }}</span>
+          <span v-if="reviewTargetTypeLabel" class="target-type-stamp">{{ reviewTargetTypeLabel }}</span>
+          <span class="version-stamp">V{{ review.versionNo || 1 }}</span>
           <span class="decision-stamp" :class="`decision-stamp--${goDecision.toLowerCase()}`">{{ goDecisionLabel }}</span>
           <span v-if="providerBadge" class="provider-stamp">{{ providerBadge }}</span>
         </div>
@@ -153,6 +155,22 @@
       </div>
 
       <footer class="report-toolbar">
+        <button class="secondary-button" type="button" @click="startNextVersion">
+          <RefreshCw :size="17" />
+          <span>基于本报告优化想法</span>
+        </button>
+        <RouterLink class="secondary-button" :to="{ name: 'idea-versions', params: { groupId: review.ideaGroupId || review.id } }">
+          <GitCompare :size="17" />
+          <span>查看迭代版本</span>
+        </RouterLink>
+        <button class="secondary-button" type="button" @click="openPackage">
+          <PackageCheck :size="17" />
+          <span>生成开发任务包</span>
+        </button>
+        <button class="secondary-button" type="button" @click="shareCardOpen = true">
+          <ImageDown :size="17" />
+          <span>生成产品体检卡</span>
+        </button>
         <button class="secondary-button" type="button" @click="downloadMarkdown(review)">
           <Download :size="17" />
           <span>导出 Markdown</span>
@@ -170,34 +188,74 @@
           <span>返回工作台</span>
         </RouterLink>
       </footer>
+
+      <div v-if="packageOpen" class="modal-backdrop" role="presentation" @click.self="packageOpen = false">
+        <section class="task-package-modal" role="dialog" aria-modal="true" aria-label="开发任务包">
+          <header>
+            <div>
+              <p class="eyebrow">Development Package</p>
+              <h2>开发任务包</h2>
+            </div>
+            <button class="tiny-copy" type="button" title="关闭" @click="packageOpen = false">
+              <X :size="16" />
+              <span>关闭</span>
+            </button>
+          </header>
+          <pre>{{ developmentPackage }}</pre>
+          <footer>
+            <button class="secondary-button" type="button" @click="copyPackage">
+              <Copy :size="17" />
+              <span>{{ copied === 'package' ? '已复制任务包' : '复制任务包' }}</span>
+            </button>
+            <button class="secondary-button strong-action" type="button" @click="downloadPackage">
+              <Download :size="17" />
+              <span>下载 Markdown</span>
+            </button>
+          </footer>
+        </section>
+      </div>
+
+      <ShareCardModal v-if="shareCardOpen" :review="review" @close="shareCardOpen = false" />
     </template>
   </article>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { RouterLink } from 'vue-router';
-import { ArrowLeft, CircleAlert, ClipboardList, Copy, Download } from '@lucide/vue';
+import { RouterLink, useRouter } from 'vue-router';
+import { ArrowLeft, CircleAlert, ClipboardList, Copy, Download, GitCompare, ImageDown, PackageCheck, RefreshCw, X } from '@lucide/vue';
 
 import ListBlock from '@/components/ListBlock.vue';
 import PixelPig from '@/components/PixelPig.vue';
+import ShareCardModal from '@/components/share/ShareCardModal.vue';
 import type { ReviewDetailResponse } from '@/types/review';
 import { copyText } from '@/utils/clipboard';
-import { modeLabels } from '@/utils/labels';
+import { buildDevelopmentPackage, buildNextDraft, downloadTextFile } from '@/utils/developmentPackage';
+import { modeLabels, reviewTargetTypeLabels } from '@/utils/labels';
 import { downloadMarkdown } from '@/utils/markdownExport';
+import { useReviewStore } from '@/stores/reviewStore';
 
 const props = defineProps<{
   review: ReviewDetailResponse;
 }>();
 
-const copied = ref<'report' | 'prompt' | ''>('');
+const copied = ref<'report' | 'prompt' | 'package' | ''>('');
+const packageOpen = ref(false);
+const shareCardOpen = ref(false);
+const router = useRouter();
+const store = useReviewStore();
 const report = computed(() => props.review.report);
+const developmentPackage = computed(() => buildDevelopmentPackage(props.review));
 const boundedBeatScore = computed(() => Math.min(100, Math.max(0, props.review.beatScore || 0)));
 const goDecision = computed(() => report.value?.goDecision || 'CONTINUE');
 const goDecisionLabel = computed(() => decisionLabels[goDecision.value]);
 const goDecisionReason = computed(
   () => report.value?.goDecisionReason || '建议继续验证，但先收缩范围并确认真实用户动机。',
 );
+const reviewTargetTypeLabel = computed(() => {
+  const type = report.value?.reviewTargetType;
+  return type ? reviewTargetTypeLabels[type] : '';
+});
 const successMetric = computed(() => report.value?.minimumBuildVersion?.successMetric || '');
 const validationPlan = computed(() => report.value?.minimumBuildVersion?.validationPlan ?? []);
 const providerBadge = computed(() => {
@@ -237,7 +295,26 @@ async function copyPrompt() {
   markCopied('prompt');
 }
 
-function markCopied(type: 'report' | 'prompt') {
+function openPackage() {
+  packageOpen.value = true;
+}
+
+async function copyPackage() {
+  await copyText(developmentPackage.value);
+  markCopied('package');
+}
+
+function downloadPackage() {
+  const date = props.review.createdAt?.slice(0, 10).replaceAll('-', '') || 'review';
+  downloadTextFile(`czspig-dev-package-${date}-${props.review.id}.md`, developmentPackage.value);
+}
+
+async function startNextVersion() {
+  store.prepareDraftFromReview(props.review, buildNextDraft(props.review));
+  await router.push({ name: 'home' });
+}
+
+function markCopied(type: 'report' | 'prompt' | 'package') {
   copied.value = type;
   window.setTimeout(() => {
     copied.value = '';

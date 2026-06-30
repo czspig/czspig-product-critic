@@ -15,6 +15,9 @@ public class ReviewRecordEntity {
     private String sessionId;
     private String inputContent;
     private String inputSummary;
+    private String ideaGroupId;
+    private Integer versionNo;
+    private Long parentReviewId;
     private String mode;
     private Integer roastLevel;
     private String oneLineVerdict;
@@ -68,6 +71,30 @@ public class ReviewRecordEntity {
 
     public void setInputSummary(String inputSummary) {
         this.inputSummary = inputSummary;
+    }
+
+    public String getIdeaGroupId() {
+        return ideaGroupId;
+    }
+
+    public void setIdeaGroupId(String ideaGroupId) {
+        this.ideaGroupId = ideaGroupId;
+    }
+
+    public Integer getVersionNo() {
+        return versionNo;
+    }
+
+    public void setVersionNo(Integer versionNo) {
+        this.versionNo = versionNo;
+    }
+
+    public Long getParentReviewId() {
+        return parentReviewId;
+    }
+
+    public void setParentReviewId(Long parentReviewId) {
+        this.parentReviewId = parentReviewId;
     }
 
     public String getMode() {

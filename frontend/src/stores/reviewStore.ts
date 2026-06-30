@@ -6,11 +6,22 @@ import type {
   CreateReviewPayload,
   PageResponse,
   ReviewDetailResponse,
+  ReviewGroupResponse,
   ReviewListItemResponse,
 } from '@/types/review';
 
+interface DraftContext {
+  content: string;
+  ideaGroupId: string;
+  parentReviewId: number;
+  parentVersionNo: number;
+  nextVersionNo: number;
+}
+
 interface ReviewState {
   currentReview: ReviewDetailResponse | null;
+  currentGroup: ReviewGroupResponse | null;
+  draftContext: DraftContext | null;
   history: ReviewListItemResponse[];
   historyTotal: number;
   historyPage: number;
@@ -22,6 +33,8 @@ interface ReviewState {
 export const useReviewStore = defineStore('review', {
   state: (): ReviewState => ({
     currentReview: null,
+    currentGroup: null,
+    draftContext: null,
     history: [],
     historyTotal: 0,
     historyPage: 1,
@@ -71,6 +84,32 @@ export const useReviewStore = defineStore('review', {
       } finally {
         this.historyLoading = false;
       }
+    },
+    async fetchGroup(ideaGroupId: string) {
+      this.loading = true;
+      this.error = '';
+      try {
+        this.currentGroup = await reviewApi.getReviewGroup(ideaGroupId);
+        return this.currentGroup;
+      } catch (error) {
+        this.error = toErrorMessage(error);
+        throw error;
+      } finally {
+        this.loading = false;
+      }
+    },
+    prepareDraftFromReview(review: ReviewDetailResponse, content: string) {
+      const parentVersionNo = review.versionNo || 1;
+      this.draftContext = {
+        content,
+        ideaGroupId: review.ideaGroupId || String(review.id),
+        parentReviewId: review.id,
+        parentVersionNo,
+        nextVersionNo: parentVersionNo + 1,
+      };
+    },
+    clearDraftContext() {
+      this.draftContext = null;
     },
   },
 });

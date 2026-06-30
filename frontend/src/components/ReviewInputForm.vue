@@ -11,12 +11,24 @@
       </button>
     </div>
 
+    <div class="input-guide" aria-label="输入提示">
+      <div>
+        <h3>怎么写，猪猪 PM 才能批得更准？</h3>
+        <p>你可以按这 4 点写：目标用户是谁？用户现在遇到什么问题？你准备用什么产品方式解决？第一版最想验证什么？</p>
+      </div>
+      <div class="guide-tags">
+        <button v-for="tag in guideTags" :key="tag.label" type="button" @click="insertGuide(tag.text)">
+          {{ tag.label }}
+        </button>
+      </div>
+    </div>
+
     <label class="draft-field">
       <span>把你的想法先摊在纸上</span>
       <textarea
         v-model.trim="form.content"
         maxlength="5000"
-        placeholder="写下产品想法、目标用户、使用场景、你担心的问题，越像真实草稿越好。"
+        placeholder="试着写清楚：你想服务谁？他们现在怎么解决？你的产品准备怎么做？第一版最想验证什么？"
       />
     </label>
 
@@ -73,7 +85,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, type Component } from 'vue';
+import { reactive, ref, watch, type Component } from 'vue';
 import {
   ArrowRight,
   BriefcaseBusiness,
@@ -87,8 +99,11 @@ import {
 
 import type { CreateReviewPayload, ReviewMode } from '@/types/review';
 
-defineProps<{
+const props = defineProps<{
   loading: boolean;
+  initialContent?: string;
+  ideaGroupId?: string;
+  parentReviewId?: number;
 }>();
 
 const emit = defineEmits<{
@@ -115,13 +130,41 @@ const levelOptions = [
   { value: 3, label: '毒舌' },
 ];
 
+const guideTags = [
+  { label: '目标用户', text: '目标用户：' },
+  { label: '真实痛点', text: '真实痛点：' },
+  { label: '现有替代方案', text: '现有替代方案：' },
+  { label: '核心功能', text: '核心功能：' },
+  { label: '第一版验证目标', text: '第一版验证目标：' },
+];
+
+watch(
+  () => props.initialContent,
+  (value) => {
+    if (value) {
+      form.content = value;
+      localError.value = '';
+    }
+  },
+  { immediate: true },
+);
+
 function handleSubmit() {
   if (form.content.length < 10) {
     localError.value = '至少输入 10 个字符，产品经理才有得批注。';
     return;
   }
   localError.value = '';
-  emit('submit', { ...form });
+  emit('submit', {
+    ...form,
+    ideaGroupId: props.ideaGroupId,
+    parentReviewId: props.parentReviewId,
+  });
+}
+
+function insertGuide(text: string) {
+  const prefix = form.content.trim() ? '\n' : '';
+  form.content = `${form.content}${prefix}${text}`;
 }
 
 function fillSample() {

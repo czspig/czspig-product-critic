@@ -6,6 +6,7 @@ import java.util.List;
 public class ReviewReportDto {
 
     private String oneLineVerdict;
+    private String reviewTargetType;
     private String goDecision;
     private String goDecisionReason;
     private Integer beatScore;
@@ -24,6 +25,14 @@ public class ReviewReportDto {
 
     public void setOneLineVerdict(String oneLineVerdict) {
         this.oneLineVerdict = oneLineVerdict;
+    }
+
+    public String getReviewTargetType() {
+        return reviewTargetType;
+    }
+
+    public void setReviewTargetType(String reviewTargetType) {
+        this.reviewTargetType = reviewTargetType;
     }
 
     public String getGoDecision() {

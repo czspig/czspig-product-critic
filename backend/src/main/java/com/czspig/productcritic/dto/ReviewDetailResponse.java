@@ -5,6 +5,10 @@ public class ReviewDetailResponse {
     private Long id;
     private String inputContent;
     private String inputSummary;
+    private String ideaGroupId;
+    private Integer versionNo;
+    private Long parentReviewId;
+    private Integer groupVersionCount;
     private String mode;
     private Integer roastLevel;
     private String oneLineVerdict;
@@ -42,6 +46,38 @@ public class ReviewDetailResponse {
 
     public void setInputSummary(String inputSummary) {
         this.inputSummary = inputSummary;
+    }
+
+    public String getIdeaGroupId() {
+        return ideaGroupId;
+    }
+
+    public void setIdeaGroupId(String ideaGroupId) {
+        this.ideaGroupId = ideaGroupId;
+    }
+
+    public Integer getVersionNo() {
+        return versionNo;
+    }
+
+    public void setVersionNo(Integer versionNo) {
+        this.versionNo = versionNo;
+    }
+
+    public Long getParentReviewId() {
+        return parentReviewId;
+    }
+
+    public void setParentReviewId(Long parentReviewId) {
+        this.parentReviewId = parentReviewId;
+    }
+
+    public Integer getGroupVersionCount() {
+        return groupVersionCount;
+    }
+
+    public void setGroupVersionCount(Integer groupVersionCount) {
+        this.groupVersionCount = groupVersionCount;
     }
 
     public String getMode() {

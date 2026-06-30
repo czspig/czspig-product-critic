@@ -14,7 +14,19 @@
     </div>
 
     <div class="workbench-main" :class="{ 'workbench-main--with-result': hasReviewWorkspace }">
-      <ReviewInputForm class="workbench-input" :loading="store.loading" @submit="handleSubmit" />
+      <div class="workbench-input">
+        <div v-if="store.draftContext" class="draft-context-banner">
+          <span>正在编辑 V{{ store.draftContext.nextVersionNo }} 草稿</span>
+          <strong>基于 V{{ store.draftContext.parentVersionNo }} 优化</strong>
+        </div>
+        <ReviewInputForm
+          :loading="store.loading"
+          :initial-content="store.draftContext?.content"
+          :idea-group-id="store.draftContext?.ideaGroupId"
+          :parent-review-id="store.draftContext?.parentReviewId"
+          @submit="handleSubmit"
+        />
+      </div>
       <aside class="latest-docket review-docket" aria-label="评审工作台">
         <template v-if="store.loading">
           <p class="eyebrow">Reviewing</p>
@@ -81,6 +93,10 @@
                 <ClipboardList :size="17" />
                 <span>{{ promptCopied ? '已复制 Prompt' : '复制开发 Prompt' }}</span>
               </button>
+              <button class="secondary-button wide" type="button" @click="shareCardOpen = true">
+                <ImageDown :size="17" />
+                <span>生成体检卡</span>
+              </button>
               <button class="secondary-button wide" type="button" @click="resetReview">
                 <RotateCcw :size="17" />
                 <span>重新评审</span>
@@ -114,16 +130,19 @@
         <p>支持导师、毒舌 PM、甲方视角三种评审语气。</p>
       </article>
     </section>
+
+    <ShareCardModal v-if="shareCardOpen && store.currentReview" :review="store.currentReview" @close="shareCardOpen = false" />
   </section>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { RouterLink } from 'vue-router';
-import { CircleAlert, ClipboardList, FileText, LoaderCircle, RefreshCw, RotateCcw } from '@lucide/vue';
+import { CircleAlert, ClipboardList, FileText, ImageDown, LoaderCircle, RefreshCw, RotateCcw } from '@lucide/vue';
 
 import PixelPig from '@/components/PixelPig.vue';
 import ReviewInputForm from '@/components/ReviewInputForm.vue';
+import ShareCardModal from '@/components/share/ShareCardModal.vue';
 import { useReviewStore } from '@/stores/reviewStore';
 import type { CreateReviewPayload } from '@/types/review';
 import { copyText } from '@/utils/clipboard';
@@ -132,6 +151,7 @@ const store = useReviewStore();
 const submitError = ref('');
 const lastPayload = ref<CreateReviewPayload | null>(null);
 const promptCopied = ref(false);
+const shareCardOpen = ref(false);
 
 const hasReviewWorkspace = computed(() => store.loading || Boolean(submitError.value) || Boolean(store.currentReview));
 const goDecision = computed(() => store.currentReview?.report?.goDecision || 'CONTINUE');
@@ -169,6 +189,7 @@ async function handleSubmit(payload: CreateReviewPayload) {
   promptCopied.value = false;
   try {
     await store.create(payload);
+    store.clearDraftContext();
   } catch {
     submitError.value = store.error || '提供评审服务时暂时遇到问题，请稍后重试。';
   }
@@ -198,6 +219,7 @@ function resetReview() {
   store.error = '';
   submitError.value = '';
   promptCopied.value = false;
+  shareCardOpen.value = false;
 }
 
 </script>

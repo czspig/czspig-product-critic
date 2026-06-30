@@ -4,6 +4,7 @@ import com.czspig.productcritic.common.ApiResponse;
 import com.czspig.productcritic.common.PageResponse;
 import com.czspig.productcritic.dto.CreateReviewRequest;
 import com.czspig.productcritic.dto.ReviewDetailResponse;
+import com.czspig.productcritic.dto.ReviewGroupResponse;
 import com.czspig.productcritic.dto.ReviewListItemResponse;
 import com.czspig.productcritic.service.ReviewService;
 import jakarta.validation.Valid;
@@ -51,6 +52,13 @@ public class ReviewController {
             @PathVariable Long id,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         return ApiResponse.ok(reviewService.getReview(id, resolveSessionId(sessionId)));
+    }
+
+    @GetMapping("/group/{ideaGroupId}")
+    public ApiResponse<ReviewGroupResponse> getReviewGroup(
+            @PathVariable String ideaGroupId,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        return ApiResponse.ok(reviewService.getReviewGroup(ideaGroupId, resolveSessionId(sessionId)));
     }
 
     private String resolveSessionId(String sessionId) {

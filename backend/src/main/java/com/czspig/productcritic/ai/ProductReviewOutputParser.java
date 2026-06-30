@@ -28,6 +28,7 @@ public class ProductReviewOutputParser {
             throw new BizException(ErrorCode.AI_PROVIDER_ERROR, "评审报告为空");
         }
         requireText(report.getOneLineVerdict(), "一句话评价不能为空");
+        requireReviewTargetType(report.getReviewTargetType());
         requireGoDecision(report.getGoDecision());
         requireText(report.getGoDecisionReason(), "是否继续做的理由不能为空");
         requireScore(report.getBeatScore(), "毒打指数");
@@ -63,6 +64,18 @@ public class ProductReviewOutputParser {
     private void requireGoDecision(String value) {
         if (!"CONTINUE".equals(value) && !"PIVOT".equals(value) && !"PAUSE".equals(value)) {
             throw new BizException(ErrorCode.AI_PROVIDER_ERROR, "是否继续做必须是 CONTINUE、PIVOT 或 PAUSE");
+        }
+    }
+
+    private void requireReviewTargetType(String value) {
+        if (value == null || value.isBlank()) {
+            return;
+        }
+        if (!"NEW_IDEA".equals(value)
+                && !"MATURE_PRODUCT".equals(value)
+                && !"CLIENT_REQUIREMENT".equals(value)
+                && !"UNCLEAR".equals(value)) {
+            throw new BizException(ErrorCode.AI_PROVIDER_ERROR, "评审对象类型必须是 NEW_IDEA、MATURE_PRODUCT、CLIENT_REQUIREMENT 或 UNCLEAR");
         }
     }
 

@@ -20,6 +20,11 @@ public class CreateReviewRequest {
     @Max(value = 3, message = "吐槽强度最大为 3")
     private Integer roastLevel;
 
+    @Size(max = 64, message = "想法组 ID 不能超过 64 个字符")
+    private String ideaGroupId;
+
+    private Long parentReviewId;
+
     public String getContent() {
         return content;
     }
@@ -42,5 +47,21 @@ public class CreateReviewRequest {
 
     public void setRoastLevel(Integer roastLevel) {
         this.roastLevel = roastLevel;
+    }
+
+    public String getIdeaGroupId() {
+        return ideaGroupId;
+    }
+
+    public void setIdeaGroupId(String ideaGroupId) {
+        this.ideaGroupId = ideaGroupId;
+    }
+
+    public Long getParentReviewId() {
+        return parentReviewId;
+    }
+
+    public void setParentReviewId(Long parentReviewId) {
+        this.parentReviewId = parentReviewId;
     }
 }

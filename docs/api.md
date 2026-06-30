@@ -69,7 +69,9 @@ X-Session-Id: local-test-session
 {
   "content": "我想做一个帮助大学生找搭子的校园小程序",
   "mode": "SHARP_PM",
-  "roastLevel": 2
+  "roastLevel": 2,
+  "ideaGroupId": "optional",
+  "parentReviewId": 12
 }
 ```
 
@@ -80,6 +82,8 @@ X-Session-Id: local-test-session
 | content | string | 是 | 产品想法或需求内容，10-5000 字符 |
 | mode | string | 是 | `MENTOR`、`SHARP_PM`、`CLIENT` |
 | roastLevel | number | 是 | 1 温和，2 正常，3 毒舌 |
+| ideaGroupId | string | 否 | 同一个产品想法的迭代组，首次提交可不传 |
+| parentReviewId | number | 否 | 基于哪一次评审继续优化，提交 V2/V3 时传 |
 
 响应关键字段：
 
@@ -91,6 +95,10 @@ X-Session-Id: local-test-session
   "data": {
     "id": 1,
     "inputSummary": "我想做一个帮助大学生找搭子的校园小程序",
+    "ideaGroupId": "1",
+    "versionNo": 1,
+    "parentReviewId": null,
+    "groupVersionCount": 1,
     "mode": "SHARP_PM",
     "roastLevel": 2,
     "oneLineVerdict": "这个想法有场景，但现在还像功能清单，不像一个真正的产品切口。",
@@ -117,6 +125,12 @@ X-Session-Id: local-test-session
 }
 ```
 
+版本规则：
+
+- 首次提交不传 `ideaGroupId` / `parentReviewId`，后端生成 `V1`，并用当前评审 `id` 作为 `ideaGroupId`。
+- 基于旧评审继续优化时传 `parentReviewId`，后端沿用父级 `ideaGroupId`，版本号自动加一。
+- 旧数据没有 `ideaGroupId` 时，后端按该条记录自身 `id` 兜底。
+
 ## 3. 获取历史记录
 
 `GET /api/reviews?page=1&pageSize=10`
@@ -136,6 +150,10 @@ X-Session-Id: local-test-session
       {
         "id": 1,
         "inputSummary": "我想做一个帮助大学生找搭子的校园小程序",
+        "ideaGroupId": "1",
+        "versionNo": 1,
+        "parentReviewId": null,
+        "groupVersionCount": 1,
         "mode": "SHARP_PM",
         "roastLevel": 2,
         "oneLineVerdict": "这个想法有场景，但现在还像功能清单，不像一个真正的产品切口。",
@@ -158,6 +176,10 @@ X-Session-Id: local-test-session
 
 - 用户原始输入
 - 输入摘要
+- 想法迭代组 `ideaGroupId`
+- 当前版本号 `versionNo`
+- 父级评审 `parentReviewId`
+- 同组版本数 `groupVersionCount`
 - 评审模式
 - 吐槽强度
 - 一句话评价
@@ -174,7 +196,44 @@ X-Session-Id: local-test-session
 - 脱敏失败原因 `errorMessage`
 - 创建时间
 
-## 5. curl 验证示例
+## 5. 获取同组迭代版本
+
+`GET /api/reviews/group/{ideaGroupId}`
+
+按匿名 session 隔离，只返回同一个想法组下的版本，按 `versionNo` 升序。
+
+响应示例：
+
+```json
+{
+  "success": true,
+  "code": "OK",
+  "message": "success",
+  "data": {
+    "ideaGroupId": "1",
+    "versions": [
+      {
+        "id": 1,
+        "versionNo": 1,
+        "parentReviewId": null,
+        "goDecision": "PIVOT",
+        "goDecisionReason": "当前切入点需要收缩。",
+        "beatScore": 78,
+        "positioningScore": 55,
+        "oneLineVerdict": "...",
+        "successMetric": "...",
+        "minimumBuildGoal": "...",
+        "coreFeatures": ["..."],
+        "excludedFeatures": ["..."],
+        "validationPlan": ["..."],
+        "createdAt": "2026-06-23 12:00:00"
+      }
+    ]
+  }
+}
+```
+
+## 6. curl 验证示例
 
 健康检查：
 
@@ -203,7 +262,13 @@ curl -H "X-Session-Id: local-test-session" "http://localhost:8080/api/reviews?pa
 curl -H "X-Session-Id: local-test-session" http://localhost:8080/api/reviews/1
 ```
 
-## 6. 人工评测
+获取同组版本：
+
+```bash
+curl -H "X-Session-Id: local-test-session" http://localhost:8080/api/reviews/group/1
+```
+
+## 7. 人工评测
 
 完整人工评测说明见：[人工评测说明](eval.md)。
 
