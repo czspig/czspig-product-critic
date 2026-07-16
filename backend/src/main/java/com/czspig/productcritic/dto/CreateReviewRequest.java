@@ -14,8 +14,8 @@ public class CreateReviewRequest {
     @NotBlank(message = "评审模式不能为空")
     private String mode;
 
-    @Min(value = 1, message = "吐槽强度最小为 1")
-    @Max(value = 3, message = "吐槽强度最大为 3")
+    @Min(value = 1, message = "毒舌强度最小为 1")
+    @Max(value = 3, message = "毒舌强度最大为 3")
     private Integer roastLevel;
 
     @Size(max = 64, message = "想法组 ID 不能超过 64 个字符")

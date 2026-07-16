@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 public class AppAiProperties {
 
     private String provider = "auto";
-    private boolean fallbackToMock = true;
+    private boolean fallbackToMock = false;
 
     public String getProvider() {
         return provider;

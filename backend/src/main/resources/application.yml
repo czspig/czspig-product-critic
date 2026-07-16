@@ -21,7 +21,7 @@ app:
   anonymous-session-id: ${APP_ANONYMOUS_SESSION_ID:anonymous-dev-session}
   ai:
     provider: ${APP_AI_PROVIDER:auto}
-    fallback-to-mock: ${APP_AI_FALLBACK_TO_MOCK:true}
+    fallback-to-mock: ${APP_AI_FALLBACK_TO_MOCK:false}
 
 deepseek:
   api-key: ${DEEPSEEK_API_KEY:}

@@ -86,7 +86,7 @@ public class ProductReviewPromptBuilder {
 
                 评审模式：%s
                 模式规则：%s
-                吐槽强度：%d
+                毒舌强度：%d
                 强度规则：%s
 
                 <user_input>
@@ -111,11 +111,11 @@ public class ProductReviewPromptBuilder {
 
     private String roastRule(Integer roastLevel) {
         if (roastLevel != null && roastLevel >= 3) {
-            return "可以更有锋芒，但绝不攻击用户本人，不低俗、不羞辱。";
+            return "地狱模式：可以更有锋芒，但绝不攻击用户本人，不低俗、不羞辱，必须给建设性建议。";
         }
         if (roastLevel != null && roastLevel <= 1) {
-            return "温柔提醒，少用尖锐措辞，但不要回避关键问题。";
+            return "温和模式：专业提醒，少用阴阳怪气，但不要回避关键问题。";
         }
-        return "直接指出问题，保持专业，给出可执行收缩建议。";
+        return "犀利模式：直接指出问题，保持专业，给出可执行收缩建议。";
     }
 }

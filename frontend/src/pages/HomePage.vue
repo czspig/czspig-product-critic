@@ -168,9 +168,9 @@ const providerBadge = computed(() => {
     return '';
   }
   if (review.fallbackUsed) {
-    return `Fallback: ${review.providerName}`;
+    return review.providerName === 'mock' ? '模拟兜底结果' : `Fallback: ${review.providerName}`;
   }
-  return review.providerName === 'mock' ? 'Mock 评审' : review.providerName;
+  return review.providerName === 'mock' ? '模拟评审' : review.providerName;
 });
 const keyValidationPlan = computed(() => {
   const plan = store.currentReview?.report?.minimumBuildVersion?.validationPlan?.filter(Boolean) ?? [];

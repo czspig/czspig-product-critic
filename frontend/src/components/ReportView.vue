@@ -268,9 +268,9 @@ const providerBadge = computed(() => {
     return '';
   }
   if (props.review.fallbackUsed) {
-    return `Fallback: ${props.review.providerName}`;
+    return props.review.providerName === 'mock' ? '模拟兜底结果' : `Fallback: ${props.review.providerName}`;
   }
-  return props.review.providerName === 'mock' ? 'Mock 评审' : props.review.providerName;
+  return props.review.providerName === 'mock' ? '模拟评审' : props.review.providerName;
 });
 
 const decisionLabels = {

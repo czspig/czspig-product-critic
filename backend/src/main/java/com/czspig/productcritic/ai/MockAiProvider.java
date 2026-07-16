@@ -56,14 +56,15 @@ public class MockAiProvider implements AiProvider {
     private String oneLineVerdict(ReviewMode mode, int roastLevel, IdeaProfile profile) {
         String tone = mode == ReviewMode.MENTOR || roastLevel <= 1
                 ? "方向可以聊，但第一刀要砍得更窄："
-                : roastLevel >= 3 ? "地狱模式直说：别急着写代码，先把这个坑看清楚：" : "犀利模式先收敛一下：";
+                : roastLevel >= 3 ? "地狱模式直说：别急着写代码，先把这个坑看清楚：" : "犀利模式先收拾一下：";
         return switch (profile.industry()) {
             case "campus_trade" -> tone + "校园二手交易不缺摊位，缺的是可信履约和供需密度，别把小程序做成空荡荡的跳蚤市场。";
             case "ai_resume" -> tone + "AI 简历优化的价值不在润色形容词，而在能不能让用户拿到更多面试回音。";
             case "pet_health" -> tone + "宠物健康管理不能假装自己是在线兽医，先从记录、提醒和异常分诊做低风险闭环。";
+            case "desktop_tool" -> tone + "桌面工具的价值不在角色可爱，而在它能不能比系统通知和备忘录更稳定地帮用户处理真实任务。";
             case "mature_product" -> "这更像成熟产品定位复盘，评审只判断这段定位是否清楚，不等于否定真实产品价值。";
             case "client_requirement" -> "这是甲方需求，不是许愿池；先把验收边界钉死，再谈排期和报价。";
-            default -> "输入信息还不够，像一张产品愿望便利贴，还没到能评审 MVP 的程度。";
+            default -> "输入信息还不太够，像一张产品愿望便利贴，还没到能评审 MVP 的程度。";
         };
     }
 
@@ -79,9 +80,10 @@ public class MockAiProvider implements AiProvider {
 
     private String goDecisionReason(IdeaProfile profile) {
         return switch (profile.industry()) {
-            case "campus_trade" -> "建议继续，但必须先验证一个校园、一个品类、一个履约方式；最大风险是供给不足和交易信任崩掉。";
+            case "campus_trade" -> "建议继续，但必须先验证一个校园、一个品类、一个履约方式；最大风险是供给不足和交易信任塌掉。";
             case "ai_resume" -> "建议调整切口，从“优化简历”收窄到“针对岗位 JD 生成可验证修改建议”；最大风险是同质化和效果不可证明。";
             case "pet_health" -> "建议谨慎继续，先避开诊断承诺；最大风险是医疗边界、数据持续录入和主人低频使用。";
+            case "desktop_tool" -> "建议谨慎验证；最大风险是用户只是觉得桌宠有趣，但不会长期授权通知、保持常驻或依赖它处理待办。";
             case "mature_product" -> "定位复盘可以继续，但要把目标组织、核心流程和差异化写具体，否则只能得到大而空的结论。";
             case "client_requirement" -> "先调整需求边界；当前最危险的是验收标准、数据责任和不做范围没有被明确。";
             default -> "暂停开发；当前缺少目标用户、使用场景和成功指标，继续写功能只会制造漂亮但无用的页面。";
@@ -93,6 +95,7 @@ public class MockAiProvider implements AiProvider {
             case "campus_trade" -> "目标用户是同校学生，真实痛点不是“想买便宜东西”这么宽，而是毕业季、换宿舍、教材换手等短窗口交易。替代方案是微信群、闲鱼和线下转让，所以产品必须证明同校信任和本地交付更省事。";
             case "ai_resume" -> "目标用户是求职者或转岗人群，痛点是简历和目标岗位不匹配、表达没有证据链、投递反馈少。替代方案是模板、朋友修改和通用 AI 聊天，差异化必须落在岗位匹配和修改理由上。";
             case "pet_health" -> "目标用户是宠物主人，痛点是疫苗驱虫提醒、症状记录和就医前信息整理。替代方案是备忘录、宠物医院微信和人工经验，产品要避免把低频焦虑包装成高频需求。";
+            case "desktop_tool" -> "目标用户更像需要跨浏览器、桌面和系统通知统一处理提醒的人。真实痛点不是“想要一个可爱桌宠”，而是通知分散、过期信息重复打扰、备忘录和天气等轻任务入口割裂。替代方案是系统通知中心、浏览器扩展、便签软件和托盘工具。";
             case "mature_product" -> "以下评审针对的是你输入的产品定位文本和从 0 复刻的可落地性，不代表对该成熟产品真实商业价值的完整评价。当前最需要补的是目标用户、关键场景和不可替代的差异化。";
             case "client_requirement" -> "甲方真正购买的是可验收的业务结果，不是功能清单。当前要先确认谁使用、谁验收、哪条主流程上线后能证明项目成功。";
             default -> "当前输入还无法判断目标用户是谁、痛点是否高频、替代方案是什么。先把“谁在什么场景下为了什么结果使用”补齐。";
@@ -116,10 +119,15 @@ public class MockAiProvider implements AiProvider {
                     "健康建议一旦越过诊断边界，会带来信任和合规风险。",
                     "最小实验：让 15 位宠物主人连续记录 14 天，观察提醒、症状记录和就医清单哪一项真正被坚持使用。"
             );
+            case "desktop_tool" -> List.of(
+                    "桌宠外观会带来第一眼兴趣，但留存取决于通知处理是否真的省心。",
+                    "浏览器插件、WebSocket、Electron 常驻和本地 JSON 存储链路较长，稳定性会直接决定用户信任。",
+                    "最小实验：让 10 位重度桌面用户连续使用 7 天，记录通知处理次数、误提醒次数和主动打开面板次数。"
+            );
             case "client_requirement" -> List.of(
                     "甲方说每个模块都要，但验收时通常只认业务结果，功能清单不能替代验收标准。",
                     "预算、数据提供、运营责任和上线后的维护人没有确认前，排期会失真。",
-                    "最小实验：让甲方签字确认 1 条主流程、3 条验收标准和明确不做范围。"
+                    "最小实验：让甲方签字确认 1 条主流程、5 条验收标准和明确不做范围。"
             );
             default -> List.of(
                     "输入太抽象，无法判断用户是否真的有强动机。",
@@ -132,8 +140,9 @@ public class MockAiProvider implements AiProvider {
     private List<String> featureRedundancyCheck(IdeaProfile profile) {
         return switch (profile.industry()) {
             case "campus_trade" -> List.of("第一版不要做积分、复杂信用体系、多校区、物流、直播带货。", "保留发布、搜索、联系卖家、成交状态和基础举报。", "评价体系等有真实成交后再补。");
-            case "ai_resume" -> List.of("第一版不要做全行业职业规划、海量模板市场、自动投递和社群。", "保留简历上传、JD 粘贴、匹配问题诊断、修改建议和前后对比。", "先证明建议质量，再谈账号体系和付费墙。");
+            case "ai_resume" -> List.of("第一版不要做全行业职业规划、海量模板市场、自动投递和社区。", "保留简历上传、JD 粘贴、匹配问题诊断、修改建议和前后对比。", "先证明建议质量，再谈账号体系和付费墙。");
             case "pet_health" -> List.of("第一版不要做在线诊断、问诊电商、宠物社区和复杂设备接入。", "保留宠物档案、疫苗驱虫提醒、症状日志和就医信息导出。", "任何医疗判断都要降级为提醒用户咨询兽医。");
+            case "desktop_tool" -> List.of("第一版不要做复杂角色养成、插件市场、多账号同步和云端社交。", "保留通知采集、桌宠提示、通知面板、去重归档和一个轻量备忘录。", "天气和外观自定义可以保留，但不要压过通知处理主链路。");
             case "client_requirement" -> List.of("先砍掉看板、营销、复杂权限和二期愿望模块。", "只保留能支撑验收的主流程。", "没有验收人的功能不进入第一版报价。");
             default -> List.of("暂不扩功能，先补产品材料。", "不要在信息不足时做登录、支付、分享、社区或后台。", "第一版范围只能是重新提交可评审材料。");
         };
@@ -144,6 +153,7 @@ public class MockAiProvider implements AiProvider {
             case "campus_trade" -> List.of("冷启动靠同校密度，不靠泛流量；没有首批卖家，买家来了也会走。", "毕业季、教材季、宿舍搬迁是更好的启动窗口。", "先用社群和地推人工导入首批商品。");
             case "ai_resume" -> List.of("冷启动难点是信任：用户要相信建议真的比通用 AI 更懂岗位。", "需要拿出匿名案例和前后对比，而不是只展示炫酷编辑器。", "先从一个垂直岗位方向做样例。");
             case "pet_health" -> List.of("冷启动不是拉宠物数量，而是让主人愿意持续记录。", "如果没有提醒和就医场景触发，App 会很快沉睡。", "从宠物医院、领养社群或新手养宠群拿首批用户。");
+            case "desktop_tool" -> List.of("冷启动要靠真实通知流，而不是靠桌宠截图传播。", "浏览器插件权限、桌面常驻和误提醒都会影响第一批用户信任。", "先从经常被网页通知和本地待办打扰的开发者或重度办公用户验证。");
             case "client_requirement" -> List.of("甲方项目的冷启动是上线后谁录数据、谁通知用户、谁处理异常。", "如果运营责任没人认领，系统做完也会空转。", "上线前确认初始数据、首批用户名单和运营责任人。");
             default -> List.of("无法判断第一批用户从哪里来。", "无法判断是否依赖内容、数据或供需双方。", "先补用户来源和一次完整使用链路。");
         };
@@ -154,6 +164,7 @@ public class MockAiProvider implements AiProvider {
             case "campus_trade" -> List.of("只做一个校区的二手交易闭环：发布、筛选、联系、成交标记。", "先用人工审核和人工处理纠纷，别急着做复杂担保。", "用成交率、商品发布数和二次发布率验证价值。");
             case "ai_resume" -> List.of("只做“简历 + 岗位 JD”的匹配诊断和可复制修改建议。", "输出每条修改的理由、对应 JD 关键词和风险提醒。", "用用户是否采纳建议、是否继续投递和面试反馈验证。");
             case "pet_health" -> List.of("只做宠物档案、关键提醒、症状日志和就医前摘要。", "不做诊断结论，只做记录整理和提醒。", "用连续记录天数、提醒完成率和导出摘要使用率验证。");
+            case "desktop_tool" -> List.of("只做浏览器通知采集到桌宠提醒再到面板归档的闭环。", "先验证 WebSocket 到 Electron 的稳定性、误提醒率和去重归档。", "桌宠表情、天气、备忘录保留最小版本，不要扩成大杂烩。");
             case "client_requirement" -> List.of("只做可验收主流程闭环。", "明确暂不做报表大屏、复杂权限、营销活动和二期模块。", "用甲方签字验收标准判断是否进入开发。");
             default -> List.of("先不开发产品，先补一版 100-200 字的产品材料。", "材料必须包含目标用户、场景、痛点、替代方案和成功指标。", "补齐后再重新评审。");
         };
@@ -164,6 +175,7 @@ public class MockAiProvider implements AiProvider {
             case "campus_trade" -> "验证同校二手交易是否能在一个高频品类里形成真实成交。";
             case "ai_resume" -> "验证岗位定制化简历建议是否比通用润色更能被用户采纳。";
             case "pet_health" -> "验证宠物主人是否愿意持续记录并在就医前使用健康摘要。";
+            case "desktop_tool" -> "验证桌面桌宠是否能稳定承接浏览器通知，并减少用户处理通知和待办的负担。";
             case "client_requirement" -> "把甲方需求收束成可报价、可排期、可验收的最小交付范围。";
             default -> "补齐产品评审材料，让输入变得可判断。";
         };
@@ -174,6 +186,7 @@ public class MockAiProvider implements AiProvider {
             case "campus_trade" -> List.of("商品发布", "校区和品类筛选", "卖家联系入口", "成交状态标记", "基础举报");
             case "ai_resume" -> List.of("简历文本输入", "目标 JD 输入", "匹配度诊断", "分段修改建议", "修改前后对比");
             case "pet_health" -> List.of("宠物档案", "疫苗驱虫提醒", "症状日志", "就医前摘要导出");
+            case "desktop_tool" -> List.of("浏览器插件采集", "WebSocket 通道", "桌宠提醒", "通知面板", "去重归档");
             case "client_requirement" -> List.of("主流程提交", "审核或处理", "结果通知", "后台查看", "验收数据留痕");
             default -> List.of("产品材料输入", "目标用户补充", "场景补充", "重新提交评审");
         };
@@ -184,6 +197,7 @@ public class MockAiProvider implements AiProvider {
             case "campus_trade" -> List.of("支付担保", "跨校物流", "积分等级", "直播卖货", "复杂仲裁");
             case "ai_resume" -> List.of("自动投递", "职业规划社区", "模板商城", "全行业知识库", "付费订阅墙");
             case "pet_health" -> List.of("在线诊断", "处方建议", "宠物电商", "社区信息流", "设备接入");
+            case "desktop_tool" -> List.of("角色养成系统", "云端同步", "插件市场", "复杂主题商城", "社交排行榜");
             case "client_requirement" -> List.of("二期愿望模块", "大屏报表", "复杂权限", "营销活动", "未定义数据迁移");
             default -> List.of("登录支付", "分享裂变", "RAG", "多 Agent", "复杂后台");
         };
@@ -194,7 +208,8 @@ public class MockAiProvider implements AiProvider {
             case "campus_trade" -> "两周内同一校区发布 100 件商品，完成 30 单交易，至少 20% 卖家愿意再次发布。";
             case "ai_resume" -> "20 位用户中至少 12 位采纳修改建议，7 天后至少 5 位反馈投递回音改善。";
             case "pet_health" -> "15 位宠物主人中至少 9 位连续记录 14 天，并有 5 位导出或查看就医摘要。";
-            case "client_requirement" -> "甲方确认 1 条主流程、3 条验收标准和不做范围，并能据此完成排期或报价。";
+            case "desktop_tool" -> "10 位用户连续使用 7 天，至少 6 位每天处理 5 条以上通知，误提醒率低于 10%。";
+            case "client_requirement" -> "甲方确认 1 条主流程、5 条验收标准和不做范围，并能据此完成排期或报价。";
             default -> "补充后的输入能明确评审对象、目标用户、使用场景和期望结果。";
         };
     }
@@ -204,6 +219,7 @@ public class MockAiProvider implements AiProvider {
             case "campus_trade" -> List.of("选定一个校区和一个品类。", "人工导入首批 50 件商品。", "记录浏览、咨询、成交和纠纷。", "访谈未成交用户为什么放弃。");
             case "ai_resume" -> List.of("限定一个岗位方向。", "收集 20 份真实简历和 JD。", "人工或半自动生成修改建议。", "跟踪用户采纳率和投递反馈。");
             case "pet_health" -> List.of("招募 15 位宠物主人。", "只验证提醒、日志和摘要三件事。", "连续观察 14 天记录留存。", "确认哪些内容会在就医前被使用。");
+            case "desktop_tool" -> List.of("找 10 位重度桌面用户安装插件和桌面端。", "连续记录 7 天通知采集、点击和归档行为。", "统计误提醒、重复提醒和主动打开面板次数。", "访谈用户是否愿意保留开机自启。");
             case "client_requirement" -> List.of("召开需求边界确认会。", "写出主流程和验收标准。", "标注不做范围和甲方责任。", "再输出报价和排期。");
             default -> List.of("补充目标用户。", "补充核心场景。", "补充替代方案。", "重新提交评审。");
         };
@@ -273,13 +289,19 @@ public class MockAiProvider implements AiProvider {
 
         static IdeaProfile from(String content) {
             String lower = content.toLowerCase(Locale.ROOT);
+            if (contains(content, "浏览器插件", "WebSocket", "Electron", "React", "桌宠", "通知", "系统托盘")
+                    || lower.contains("electron")
+                    || lower.contains("react")
+                    || lower.contains("websocket")) {
+                return new IdeaProfile(title(content, "桌面通知工具"), "desktop_tool", "NEW_IDEA", "PIVOT", 64, 58);
+            }
             if (contains(content, "甲方", "客户", "外包", "报价", "验收", "需求文档")) {
                 return new IdeaProfile(title(content, "甲方需求"), "client_requirement", "CLIENT_REQUIREMENT", "PIVOT", 72, 48);
             }
             if (contains(content, "飞书", "钉钉", "企业微信", "Notion", "Slack", "微信读书")) {
                 return new IdeaProfile(title(content, "成熟产品复盘"), "mature_product", "MATURE_PRODUCT", "PIVOT", 58, 56);
             }
-            if (contains(content, "校园", "学生", "二手", "交易", "教材", "宿舍")) {
+            if (isCampusTrade(content)) {
                 return new IdeaProfile(title(content, "校园二手交易"), "campus_trade", "NEW_IDEA", "CONTINUE", 54, 68);
             }
             if (contains(content, "简历", "求职", "岗位", "面试", "招聘") || lower.contains("resume") || lower.contains("jd")) {
@@ -292,6 +314,12 @@ public class MockAiProvider implements AiProvider {
                 return new IdeaProfile(title(content, "新产品想法"), "generic", "NEW_IDEA", "PAUSE", 78, 36);
             }
             return new IdeaProfile(title(content, "未明确输入"), "unclear", "UNCLEAR", "PAUSE", 86, 22);
+        }
+
+        private static boolean isCampusTrade(String content) {
+            boolean campusContext = contains(content, "校园", "校区", "同校", "学生", "教材", "宿舍", "毕业季");
+            boolean tradeContext = contains(content, "二手", "闲置", "转卖", "交易", "卖家", "买家");
+            return campusContext && tradeContext;
         }
 
         private static boolean contains(String content, String... keywords) {

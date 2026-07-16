@@ -11,11 +11,13 @@ import com.czspig.productcritic.dto.ReviewReportDto;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 
 @Component
 public class DeepSeekAiProvider implements AiProvider {
@@ -43,8 +45,12 @@ public class DeepSeekAiProvider implements AiProvider {
         try {
             return outputParser.parseAndValidate(content, objectMapper);
         } catch (RuntimeException firstError) {
-            String repairedContent = callDeepSeek(buildRepairPrompt(content));
-            return outputParser.parseAndValidate(repairedContent, objectMapper);
+            try {
+                String repairedContent = callDeepSeek(buildRepairPrompt(content));
+                return outputParser.parseAndValidate(repairedContent, objectMapper);
+            } catch (RuntimeException repairError) {
+                throw new BizException(ErrorCode.AI_PROVIDER_ERROR, "DeepSeek 输出不是可用的结构化 JSON，自动修复失败");
+            }
         }
     }
 
@@ -70,7 +76,7 @@ public class DeepSeekAiProvider implements AiProvider {
         Map<String, Object> requestBody = Map.of(
                 "model", properties.getModel(),
                 "messages", List.of(
-                        Map.of("role", "system", "content", "你必须输出合法 JSON 对象，不要使用 Markdown 代码块。"),
+                        Map.of("role", "system", "content", "你必须输出合法 JSON 对象，不要使用 Markdown 代码块，不要输出解释文字。"),
                         Map.of("role", "user", "content", prompt)
                 ),
                 "response_format", Map.of("type", "json_object"),
@@ -88,12 +94,17 @@ public class DeepSeekAiProvider implements AiProvider {
                     .retrieve()
                     .body(String.class);
             return extractContent(responseBody);
+        } catch (RestClientResponseException ex) {
+            throw new BizException(ErrorCode.AI_PROVIDER_ERROR, httpErrorMessage(ex.getStatusCode()));
         } catch (RestClientException ex) {
-            throw new BizException(ErrorCode.AI_PROVIDER_ERROR, "DeepSeek 调用失败，请稍后再试");
+            throw new BizException(ErrorCode.AI_PROVIDER_ERROR, "DeepSeek 网络连接失败或请求超时，请稍后再试");
         }
     }
 
     private String extractContent(String responseBody) {
+        if (responseBody == null || responseBody.isBlank()) {
+            throw new BizException(ErrorCode.AI_PROVIDER_ERROR, "DeepSeek 返回内容为空");
+        }
         try {
             JsonNode root = objectMapper.readTree(responseBody);
             JsonNode content = root.path("choices").path(0).path("message").path("content");
@@ -112,7 +123,6 @@ public class DeepSeekAiProvider implements AiProvider {
         return """
                 请把下面内容修复为合法 JSON 对象，只输出 JSON，不要输出解释文字或 Markdown。
                 必须包含全部字段，字段名不能改；缺失字段请根据已有内容补合理兜底，不要留空。
-
                 必须符合这个结构：
                 {
                   "oneLineVerdict": "string",
@@ -147,5 +157,19 @@ public class DeepSeekAiProvider implements AiProvider {
                 %s
                 </invalid_output>
                 """.formatted(invalidOutput == null ? "" : invalidOutput);
+    }
+
+    private String httpErrorMessage(HttpStatusCode statusCode) {
+        int status = statusCode == null ? 0 : statusCode.value();
+        if (status == 401 || status == 403) {
+            return "DeepSeek 鉴权失败，请检查 API Key 是否有效";
+        }
+        if (status == 429) {
+            return "DeepSeek 调用触发限流，请稍后再试或检查额度";
+        }
+        if (status >= 500) {
+            return "DeepSeek 服务暂时不可用，请稍后再试";
+        }
+        return "DeepSeek 调用失败，HTTP 状态码 " + status;
     }
 }

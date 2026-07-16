@@ -10,8 +10,9 @@ spring:
 app:
   anonymous-session-id: anonymous-dev-session
   ai:
+    # Use "mock" explicitly for local/offline demos; formal review should use DeepSeek.
     provider: auto
-    fallback-to-mock: true
+    fallback-to-mock: false
 
 deepseek:
   api-key: ${DEEPSEEK_API_KEY}

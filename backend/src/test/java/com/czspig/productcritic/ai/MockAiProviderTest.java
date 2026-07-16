@@ -60,6 +60,18 @@ class MockAiProviderTest {
         assertThat(hell.getBeatScore()).isGreaterThan(mild.getBeatScore());
     }
 
+    @Test
+    void shouldNotTreatDesktopNotificationToolAsCampusTrade() {
+        ReviewReportDto report = provider.review(request("""
+                数据流：浏览器插件爬取 -> WebSocket (9876) -> Electron 主进程 -> JSON 文件存储 -> React 渲染。
+                特色功能：桌面桌宠、通知面板、天气面板、备忘录、开机自启、系统托盘、去重归档。
+                """), "");
+
+        assertThat(report.getOneLineVerdict()).contains("桌面工具");
+        assertThat(report.getOneLineVerdict()).doesNotContain("校园二手交易");
+        assertThat(report.getMinimumBuildVersion().getCoreFeatures()).contains("浏览器插件采集");
+    }
+
     private CreateReviewRequest request(String content) {
         return request(content, 2);
     }

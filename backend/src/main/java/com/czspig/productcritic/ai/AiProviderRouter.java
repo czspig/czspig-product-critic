@@ -36,6 +36,12 @@ public class AiProviderRouter implements AiProvider {
         AiProvider selected = selectProvider();
         lastProvider.set(selected);
         lastFallbackUsed.set(false);
+        if (selected == deepSeekAiProvider && !deepSeekProperties.hasApiKey()) {
+            throw new BizException(
+                    ErrorCode.AI_PROVIDER_ERROR,
+                    "未配置 DeepSeek API Key，无法进行正式 AI 评审；开发环境可设置 APP_AI_PROVIDER=mock 使用模拟评审。"
+            );
+        }
         try {
             ReviewReportDto report = selected.review(request, prompt);
             lastProvider.set(selected);
