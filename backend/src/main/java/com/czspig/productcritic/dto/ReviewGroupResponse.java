@@ -39,6 +39,10 @@ public class ReviewGroupResponse {
         private List<String> coreFeatures = new ArrayList<>();
         private List<String> excludedFeatures = new ArrayList<>();
         private List<String> validationPlan = new ArrayList<>();
+        private String scoreChangeReason;
+        private String confidenceSummary;
+        private List<String> criticalHypotheses = new ArrayList<>();
+        private String qualityStatus;
         private String createdAt;
 
         public Long getId() {
@@ -143,6 +147,38 @@ public class ReviewGroupResponse {
 
         public void setValidationPlan(List<String> validationPlan) {
             this.validationPlan = validationPlan;
+        }
+
+        public String getScoreChangeReason() {
+            return scoreChangeReason;
+        }
+
+        public void setScoreChangeReason(String scoreChangeReason) {
+            this.scoreChangeReason = scoreChangeReason;
+        }
+
+        public String getConfidenceSummary() {
+            return confidenceSummary;
+        }
+
+        public void setConfidenceSummary(String confidenceSummary) {
+            this.confidenceSummary = confidenceSummary;
+        }
+
+        public List<String> getCriticalHypotheses() {
+            return criticalHypotheses;
+        }
+
+        public void setCriticalHypotheses(List<String> criticalHypotheses) {
+            this.criticalHypotheses = criticalHypotheses;
+        }
+
+        public String getQualityStatus() {
+            return qualityStatus;
+        }
+
+        public void setQualityStatus(String qualityStatus) {
+            this.qualityStatus = qualityStatus;
         }
 
         public String getCreatedAt() {

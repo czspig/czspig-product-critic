@@ -43,6 +43,7 @@
             <tr>
               <th>版本</th>
               <th>分数变化</th>
+              <th>可信度</th>
               <th>决策变化</th>
               <th>MVP 变化</th>
               <th>验证计划变化</th>
@@ -60,6 +61,14 @@
                 <small>{{ scoreDelta(version.beatScore, previousOf(version)?.beatScore, 'beat') }}</small>
                 <span>定位 {{ version.positioningScore ?? 0 }}/100</span>
                 <small>{{ scoreDelta(version.positioningScore, previousOf(version)?.positioningScore, 'positioning') }}</small>
+                <small v-if="version.scoreChangeReason">{{ version.scoreChangeReason }}</small>
+              </td>
+              <td>
+                <strong>{{ qualityStatusLabel(version.qualityStatus) }}</strong>
+                <p>{{ version.confidenceSummary || '暂无置信度摘要' }}</p>
+                <ul>
+                  <li v-for="item in nonEmpty(version.criticalHypotheses)" :key="item">{{ item }}</li>
+                </ul>
               </td>
               <td>
                 <strong>{{ decisionLabels[version.goDecision || 'CONTINUE'] }}</strong>
@@ -96,7 +105,7 @@ import { RouterLink, useRoute } from 'vue-router';
 import { ArrowLeft, CircleAlert, LoaderCircle } from '@lucide/vue';
 
 import { useReviewStore } from '@/stores/reviewStore';
-import type { ReviewVersionItem } from '@/types/review';
+import type { QualityStatus, ReviewVersionItem } from '@/types/review';
 
 const route = useRoute();
 const store = useReviewStore();
@@ -137,6 +146,13 @@ function scoreDelta(current: number | undefined, previous: number | undefined, t
     ? delta < 0 ? '风险下降' : '风险上升'
     : delta > 0 ? '更清晰' : '更模糊';
   return `${prefix}${delta}，${meaning}`;
+}
+
+function qualityStatusLabel(value?: QualityStatus) {
+  if (value === 'PASS') return '质量通过';
+  if (value === 'FAIL') return '质量未通过';
+  if (value === 'WARNING') return '质量需注意';
+  return '暂无自检';
 }
 
 function nonEmpty(items: string[] | undefined) {

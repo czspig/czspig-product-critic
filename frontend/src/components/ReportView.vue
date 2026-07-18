@@ -54,6 +54,8 @@
         <div class="report-body">
           <ScoreOverviewCard :review="review" />
           <DimensionScoreList :review="review" />
+          <KnowledgeBoundaryPanel :review="review" />
+          <QualityAuditPanel :review="review" />
 
           <section id="pain" class="report-section report-section--lead">
             <div class="section-title">
@@ -230,7 +232,9 @@ import { ArrowLeft, CircleAlert, ClipboardList, Copy, Download, GitCompare, Imag
 
 import ListBlock from '@/components/ListBlock.vue';
 import DimensionScoreList from '@/components/DimensionScoreList.vue';
+import KnowledgeBoundaryPanel from '@/components/KnowledgeBoundaryPanel.vue';
 import PixelPig from '@/components/PixelPig.vue';
+import QualityAuditPanel from '@/components/QualityAuditPanel.vue';
 import ScoreOverviewCard from '@/components/ScoreOverviewCard.vue';
 import ShareCardModal from '@/components/share/ShareCardModal.vue';
 import type { ReviewDetailResponse } from '@/types/review';

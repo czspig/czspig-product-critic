@@ -19,7 +19,10 @@ class ProductReviewPromptBuilderTest {
         String prompt = builder.build(request);
 
         assertThat(prompt).contains("\u6bd2\u820c\u5f3a\u5ea6\uff1a3");
-        assertThat(prompt).contains("\u53ef\u4ee5\u66f4\u6709\u950b\u8292");
+        assertThat(prompt).contains("overallAssessment.decision");
+        assertThat(prompt).contains("dimensionScores");
+        assertThat(prompt).contains("knowledgeBoundary");
+        assertThat(prompt).contains("qualityAudit");
         assertThat(prompt).contains("<user_input>");
     }
 
@@ -32,6 +35,7 @@ class ProductReviewPromptBuilderTest {
         String prompt = builder.build(request);
 
         assertThat(prompt).contains("\u6bd2\u820c\u5f3a\u5ea6\uff1a2");
-        assertThat(prompt).contains("\u76f4\u63a5\u6307\u51fa\u95ee\u9898");
+        assertThat(prompt).contains("HIGHER_IS_WORSE");
+        assertThat(prompt).contains("providedFacts");
     }
 }

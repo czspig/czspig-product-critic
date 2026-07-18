@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test;
 
 class ProductReviewOutputParserTest {
 
-    private final ProductReviewOutputParser parser = new ProductReviewOutputParser();
+    private final ProductReviewOutputParser parser = new ProductReviewOutputParser(new ReviewReportRuleEngine());
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test

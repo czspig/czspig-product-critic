@@ -122,7 +122,7 @@ public class DeepSeekAiProvider implements AiProvider {
     private String buildRepairPrompt(String invalidOutput) {
         return """
                 请把下面内容修复为合法 JSON 对象，只输出 JSON，不要输出解释文字或 Markdown。
-                必须包含全部字段，字段名不能改；缺失字段请根据已有内容补合理兜底，不要留空。
+                必须保留旧字段，并补齐可信评审字段；缺失字段请根据已有内容做保守兜底，不要编造外部市场数据、用户访谈或营收事实。
                 必须符合这个结构：
                 {
                   "oneLineVerdict": "string",
@@ -143,14 +143,51 @@ public class DeepSeekAiProvider implements AiProvider {
                     "successMetric": "string",
                     "validationPlan": ["string"]
                   },
-                  "developerPrompt": "string"
+                  "developerPrompt": "string",
+                  "overallAssessment": {
+                    "overallScore": 0,
+                    "decision": "PROCEED | VALIDATE_FIRST | NARROW_SCOPE | PAUSE",
+                    "strongestDimension": "string",
+                    "weakestDimension": "string",
+                    "mostUncertainDimension": "string",
+                    "priorityQuestion": "string",
+                    "overallReasoning": "string"
+                  },
+                  "dimensionScores": [
+                    {
+                      "dimensionKey": "painPoint | marketSpace | businessModel | implementationDifficulty | growthPotential | riskLevel",
+                      "dimensionName": "string",
+                      "score": 0,
+                      "confidence": "HIGH | MEDIUM | LOW",
+                      "scoreDirection": "HIGHER_IS_BETTER | HIGHER_IS_WORSE",
+                      "summary": "string",
+                      "evidence": ["string"],
+                      "deductions": ["string"],
+                      "missingInformation": ["string"],
+                      "improvementActions": ["string"],
+                      "changeReason": "string"
+                    }
+                  ],
+                  "knowledgeBoundary": {
+                    "providedFacts": [{"statement": "string", "sourceText": "string"}],
+                    "inferences": [{"statement": "string", "basis": "string", "confidence": "HIGH | MEDIUM | LOW"}],
+                    "criticalHypotheses": [{"statement": "string", "importance": "HIGH | MEDIUM | LOW", "impactIfFalse": "string", "relatedDimensions": ["string"]}],
+                    "unknowns": [{"question": "string", "reason": "string"}]
+                  },
+                  "qualityAudit": {
+                    "overallStatus": "PASS | WARNING | FAIL",
+                    "summary": "string",
+                    "checks": [{"key": "string", "name": "string", "status": "PASS | WARNING | FAIL", "message": "string", "relatedPaths": ["string"]}],
+                    "issues": [{"severity": "HIGH | MEDIUM | LOW", "type": "string", "message": "string", "suggestion": "string"}]
+                  }
                 }
 
                 字段规则：
-                - beatScore 和 positioningScore 必须是 0-100 整数。
-                - 数组字段至少 1 项，最好 2-4 项。
-                - reviewTargetType 和 goDecision 只能使用枚举值。
-                - developerPrompt 必须可直接复制给 Codex/Cursor。
+                - beatScore、positioningScore、overallScore、dimensionScores.score 必须是 0-100 整数。
+                - dimensionScores 必须包含 6 个固定维度：painPoint、marketSpace、businessModel、implementationDifficulty、growthPotential、riskLevel。
+                - implementationDifficulty 和 riskLevel 的 scoreDirection 必须是 HIGHER_IS_WORSE，其余维度必须是 HIGHER_IS_BETTER。
+                - providedFacts 只能写用户输入中能定位到原文的信息；无法确认的内容放入 inferences、criticalHypotheses 或 unknowns。
+                - qualityAudit 可以先给初值，后端会再次规则审计。
 
                 待修复内容：
                 <invalid_output>

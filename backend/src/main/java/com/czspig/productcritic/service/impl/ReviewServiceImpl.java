@@ -13,6 +13,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.czspig.productcritic.ai.AiProvider;
 import com.czspig.productcritic.ai.ProductReviewOutputParser;
 import com.czspig.productcritic.ai.ProductReviewPromptBuilder;
+import com.czspig.productcritic.ai.ReviewReportRuleEngine;
 import com.czspig.productcritic.common.BizException;
 import com.czspig.productcritic.common.ErrorCode;
 import com.czspig.productcritic.common.PageResponse;
@@ -47,6 +48,7 @@ public class ReviewServiceImpl implements ReviewService {
     private final AiProvider aiProvider;
     private final ProductReviewPromptBuilder promptBuilder;
     private final ProductReviewOutputParser outputParser;
+    private final ReviewReportRuleEngine ruleEngine;
     private final ObjectMapper objectMapper;
 
     public ReviewServiceImpl(
@@ -55,12 +57,14 @@ public class ReviewServiceImpl implements ReviewService {
             AiProvider aiProvider,
             ProductReviewPromptBuilder promptBuilder,
             ProductReviewOutputParser outputParser,
+            ReviewReportRuleEngine ruleEngine,
             ObjectMapper objectMapper) {
         this.reviewRecordMapper = reviewRecordMapper;
         this.aiCallLogMapper = aiCallLogMapper;
         this.aiProvider = aiProvider;
         this.promptBuilder = promptBuilder;
         this.outputParser = outputParser;
+        this.ruleEngine = ruleEngine;
         this.objectMapper = objectMapper;
     }
 
@@ -120,10 +124,12 @@ public class ReviewServiceImpl implements ReviewService {
                     execution.fallbackUsed(),
                     promptHash
             );
+            ruleEngine.normalizeTrustedReview(report);
+            ruleEngine.audit(report);
             outputParser.validate(report);
 
             String reportJson = writeJson(report);
-            String reportMarkdown = renderMarkdown(safeContent, mode, safeRoastLevel, report, execution);
+            String reportMarkdown = renderTrustedMarkdown(safeContent, mode, safeRoastLevel, report, execution);
             LocalDateTime finishedAt = LocalDateTime.now();
             record.setOneLineVerdict(report.getOneLineVerdict());
             record.setBeatScore(report.getBeatScore());
@@ -347,8 +353,44 @@ public class ReviewServiceImpl implements ReviewService {
         item.setCoreFeatures(minimum == null ? List.of() : minimum.getCoreFeatures());
         item.setExcludedFeatures(minimum == null ? List.of() : minimum.getExcludedFeatures());
         item.setValidationPlan(minimum == null ? List.of() : minimum.getValidationPlan());
+        item.setScoreChangeReason(firstDimensionChangeReason(report));
+        item.setConfidenceSummary(confidenceSummary(report));
+        item.setCriticalHypotheses(criticalHypotheses(report));
+        item.setQualityStatus(report.getQualityAudit() == null ? null : report.getQualityAudit().getOverallStatus());
         item.setCreatedAt(formatTime(record.getCreatedAt()));
         return item;
+    }
+
+    private String firstDimensionChangeReason(ReviewReportDto report) {
+        if (report.getDimensionScores() == null || report.getDimensionScores().isEmpty()) {
+            return null;
+        }
+        return report.getDimensionScores().stream()
+                .map(ReviewReportDto.DimensionScore::getChangeReason)
+                .filter(value -> value != null && !value.isBlank())
+                .findFirst()
+                .orElse(null);
+    }
+
+    private String confidenceSummary(ReviewReportDto report) {
+        if (report.getDimensionScores() == null || report.getDimensionScores().isEmpty()) {
+            return null;
+        }
+        long high = report.getDimensionScores().stream().filter(item -> "HIGH".equals(item.getConfidence())).count();
+        long medium = report.getDimensionScores().stream().filter(item -> "MEDIUM".equals(item.getConfidence())).count();
+        long low = report.getDimensionScores().stream().filter(item -> "LOW".equals(item.getConfidence())).count();
+        return "高 " + high + " / 中 " + medium + " / 低 " + low;
+    }
+
+    private List<String> criticalHypotheses(ReviewReportDto report) {
+        if (report.getKnowledgeBoundary() == null || report.getKnowledgeBoundary().getCriticalHypotheses() == null) {
+            return List.of();
+        }
+        return report.getKnowledgeBoundary().getCriticalHypotheses().stream()
+                .map(ReviewReportDto.CriticalHypothesis::getStatement)
+                .filter(value -> value != null && !value.isBlank())
+                .limit(3)
+                .toList();
     }
 
     private ReviewDetailResponse toDetailResponse(ReviewRecordEntity record, ReviewReportDto report) {
@@ -544,6 +586,202 @@ public class ReviewServiceImpl implements ReviewService {
         } catch (JsonProcessingException ex) {
             throw new BizException(ErrorCode.AI_PROVIDER_ERROR, "评审报告解析失败");
         }
+    }
+
+    private String renderTrustedMarkdown(
+            String content,
+            ReviewMode mode,
+            Integer roastLevel,
+            ReviewReportDto report,
+            AiProvider.ProviderExecution execution) {
+        StringBuilder builder = new StringBuilder();
+        ReviewReportDto.MinimumBuildVersion minimum = report.getMinimumBuildVersion();
+        ReviewReportDto.OverallAssessment overall = report.getOverallAssessment();
+        ReviewReportDto.KnowledgeBoundary boundary = report.getKnowledgeBoundary();
+        ReviewReportDto.QualityAudit audit = report.getQualityAudit();
+
+        builder.append("# 猪猪产品毒蛇官可信评审报告\n\n");
+        builder.append("> 评审来源：").append(providerLabel(execution)).append("\n\n");
+
+        builder.append("## 1. 一句话结论\n\n");
+        builder.append("- 总体判断：").append(overall == null ? trustedDecisionLabel(report.getGoDecision()) : overallDecisionLabel(overall.getDecision())).append("\n");
+        builder.append("- 一句话毒舌结论：").append(report.getOneLineVerdict()).append("\n");
+        builder.append("- 下一步建议：").append(overall == null ? report.getGoDecisionReason() : overall.getPriorityQuestion()).append("\n\n");
+
+        builder.append("## 2. 总体判断\n\n");
+        builder.append("- 评审对象：").append(trustedTargetTypeLabel(report.getReviewTargetType())).append("\n");
+        builder.append("- 旧版决策：").append(trustedDecisionLabel(report.getGoDecision())).append("\n");
+        builder.append("- 毒打指数：").append(report.getBeatScore()).append("/100\n");
+        builder.append("- 产品定位评分：").append(report.getPositioningScore()).append("/100\n");
+        if (overall != null) {
+            builder.append("- 可信总分：").append(overall.getOverallScore()).append("/100\n");
+            builder.append("- 最强维度：").append(overall.getStrongestDimension()).append("\n");
+            builder.append("- 最弱维度：").append(overall.getWeakestDimension()).append("\n");
+            builder.append("- 最不确定维度：").append(overall.getMostUncertainDimension()).append("\n");
+            builder.append("- 判断理由：").append(overall.getOverallReasoning()).append("\n");
+        }
+        builder.append("\n");
+
+        builder.append("## 3. 多维评分与证据\n\n");
+        if (report.getDimensionScores() == null || report.getDimensionScores().isEmpty()) {
+            builder.append("该报告生成于可信评审功能上线前，暂无评分证据链。\n\n");
+        } else {
+            for (ReviewReportDto.DimensionScore dimension : report.getDimensionScores()) {
+                builder.append("### ").append(dimension.getDimensionName()).append("\n\n");
+                builder.append("- 分数：").append(dimension.getScore()).append("/100\n");
+                builder.append("- 置信度：").append(confidenceLabel(dimension.getConfidence())).append("\n");
+                builder.append("- 方向：").append(scoreDirectionLabel(dimension.getScoreDirection())).append("\n");
+                builder.append("- 摘要：").append(dimension.getSummary()).append("\n\n");
+                appendMarkdownList(builder, "得分依据", dimension.getEvidence());
+                appendMarkdownList(builder, "主要扣分项", dimension.getDeductions());
+                appendMarkdownList(builder, "缺失信息", dimension.getMissingInformation());
+                appendMarkdownList(builder, "提升建议", dimension.getImprovementActions());
+            }
+        }
+
+        builder.append("## 4. 用户已提供事实\n\n");
+        if (boundary == null || boundary.getProvidedFacts() == null || boundary.getProvidedFacts().isEmpty()) {
+            builder.append("- 暂无可定位事实。\n\n");
+        } else {
+            for (ReviewReportDto.ProvidedFact fact : boundary.getProvidedFacts()) {
+                builder.append("- ").append(fact.getStatement()).append("（原文：").append(fact.getSourceText()).append("）\n");
+            }
+            builder.append("\n");
+        }
+
+        builder.append("## 5. AI 推测\n\n");
+        if (boundary == null || boundary.getInferences() == null || boundary.getInferences().isEmpty()) {
+            builder.append("- 暂无推测。\n\n");
+        } else {
+            for (ReviewReportDto.Inference inference : boundary.getInferences()) {
+                builder.append("- ").append(inference.getStatement())
+                        .append("（").append(confidenceLabel(inference.getConfidence()))
+                        .append("，依据：").append(inference.getBasis()).append("）\n");
+            }
+            builder.append("\n");
+        }
+
+        builder.append("## 6. 关键待验证假设\n\n");
+        if (boundary == null || boundary.getCriticalHypotheses() == null || boundary.getCriticalHypotheses().isEmpty()) {
+            builder.append("- 暂无关键假设。\n\n");
+        } else {
+            for (ReviewReportDto.CriticalHypothesis hypothesis : boundary.getCriticalHypotheses()) {
+                builder.append("- ").append(hypothesis.getStatement())
+                        .append("（优先级：").append(confidenceLabel(hypothesis.getImportance()))
+                        .append("，若不成立：").append(hypothesis.getImpactIfFalse()).append("）\n");
+            }
+            builder.append("\n");
+        }
+
+        builder.append("## 7. 当前未知问题\n\n");
+        if (boundary == null || boundary.getUnknowns() == null || boundary.getUnknowns().isEmpty()) {
+            builder.append("- 暂无未知问题。\n\n");
+        } else {
+            for (ReviewReportDto.UnknownQuestion unknown : boundary.getUnknowns()) {
+                builder.append("- ").append(unknown.getQuestion()).append("：").append(unknown.getReason()).append("\n");
+            }
+            builder.append("\n");
+        }
+
+        builder.append("## 8. 结构化评审报告\n\n");
+        builder.append("### 用户痛点分析\n\n").append(report.getPainPointAnalysis()).append("\n\n");
+        appendMarkdownList(builder, "伪需求风险", report.getFakeDemandRisks());
+        appendMarkdownList(builder, "功能冗余检查", report.getFeatureRedundancyCheck());
+        appendMarkdownList(builder, "冷启动问题", report.getColdStartProblems());
+
+        builder.append("## 9. MVP 建议\n\n");
+        appendMarkdownList(builder, "MVP 改造建议", report.getMvpSuggestions());
+        builder.append("### 最小可开发版本\n\n");
+        builder.append("- 目标：").append(minimum.getGoal()).append("\n");
+        builder.append("- 成功指标：").append(minimum.getSuccessMetric()).append("\n\n");
+        appendMarkdownList(builder, "核心功能", minimum.getCoreFeatures());
+        appendMarkdownList(builder, "暂不实现", minimum.getExcludedFeatures());
+
+        builder.append("## 10. 验证计划\n\n");
+        appendMarkdownList(builder, "验证动作", minimum.getValidationPlan());
+
+        builder.append("## 11. 报告质量检查\n\n");
+        if (audit == null) {
+            builder.append("该报告暂无质量自检结果。\n\n");
+        } else {
+            builder.append("- 总体状态：").append(qualityStatusLabel(audit.getOverallStatus())).append("\n");
+            builder.append("- 摘要：").append(audit.getSummary()).append("\n\n");
+            if (audit.getChecks() != null) {
+                for (ReviewReportDto.QualityCheck check : audit.getChecks()) {
+                    builder.append("- ").append(check.getName()).append("：")
+                            .append(qualityStatusLabel(check.getStatus()))
+                            .append("，").append(check.getMessage()).append("\n");
+                }
+                builder.append("\n");
+            }
+        }
+
+        builder.append("## 12. 开发任务 Prompt\n\n");
+        builder.append("```markdown\n").append(report.getDeveloperPrompt()).append("\n```\n\n");
+        builder.append("---\n\n");
+        builder.append("评审模式：").append(mode.name()).append("\n\n");
+        builder.append("毒舌强度：").append(roastLevel).append("\n\n");
+        builder.append("原始输入摘要：").append(buildSummary(content)).append("\n");
+        return builder.toString();
+    }
+
+    private void appendMarkdownList(StringBuilder builder, String title, List<String> values) {
+        builder.append("### ").append(title).append("\n\n");
+        if (values == null || values.isEmpty()) {
+            builder.append("- 暂无\n\n");
+            return;
+        }
+        for (String value : values) {
+            builder.append("- ").append(value).append("\n");
+        }
+        builder.append("\n");
+    }
+
+    private String overallDecisionLabel(String decision) {
+        return switch (decision == null ? "" : decision) {
+            case "PROCEED" -> "值得做";
+            case "NARROW_SCOPE" -> "先缩小范围";
+            case "PAUSE" -> "不建议投入";
+            default -> "谨慎验证";
+        };
+    }
+
+    private String trustedDecisionLabel(String decision) {
+        return switch (decision == null ? "" : decision) {
+            case "PIVOT" -> "建议调整方向";
+            case "PAUSE" -> "建议暂缓";
+            default -> "建议继续";
+        };
+    }
+
+    private String trustedTargetTypeLabel(String type) {
+        return switch (type == null ? "" : type) {
+            case "NEW_IDEA" -> "新产品想法";
+            case "MATURE_PRODUCT" -> "成熟产品复盘";
+            case "CLIENT_REQUIREMENT" -> "甲方需求";
+            case "UNCLEAR" -> "输入不清晰";
+            default -> "未识别";
+        };
+    }
+
+    private String confidenceLabel(String value) {
+        return switch (value == null ? "" : value) {
+            case "HIGH" -> "高";
+            case "LOW" -> "低";
+            default -> "中";
+        };
+    }
+
+    private String scoreDirectionLabel(String value) {
+        return "HIGHER_IS_WORSE".equals(value) ? "分数越高，问题越重" : "分数越高，表现越好";
+    }
+
+    private String qualityStatusLabel(String value) {
+        return switch (value == null ? "" : value) {
+            case "PASS" -> "通过";
+            case "FAIL" -> "未通过";
+            default -> "需注意";
+        };
     }
 
     private String renderMarkdown(

@@ -11,6 +11,7 @@ import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.czspig.productcritic.ai.MockAiProvider;
 import com.czspig.productcritic.ai.ProductReviewOutputParser;
 import com.czspig.productcritic.ai.ProductReviewPromptBuilder;
+import com.czspig.productcritic.ai.ReviewReportRuleEngine;
 import com.czspig.productcritic.common.ReviewStatus;
 import com.czspig.productcritic.dto.CreateReviewRequest;
 import com.czspig.productcritic.dto.ReviewDetailResponse;
@@ -33,12 +34,14 @@ class ReviewServiceImplTest {
         when(reviewRecordMapper.selectCount(any(Wrapper.class))).thenReturn(1L);
         when(aiCallLogMapper.insert(any(AiCallLogEntity.class))).thenReturn(1);
 
+        ReviewReportRuleEngine ruleEngine = new ReviewReportRuleEngine();
         ReviewServiceImpl service = new ReviewServiceImpl(
                 reviewRecordMapper,
                 aiCallLogMapper,
                 new MockAiProvider(),
                 new ProductReviewPromptBuilder(),
-                new ProductReviewOutputParser(),
+                new ProductReviewOutputParser(ruleEngine),
+                ruleEngine,
                 new ObjectMapper()
         );
 

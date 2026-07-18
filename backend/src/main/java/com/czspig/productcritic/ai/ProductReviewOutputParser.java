@@ -13,10 +13,18 @@ import org.springframework.stereotype.Component;
 @Component
 public class ProductReviewOutputParser {
 
+    private final ReviewReportRuleEngine ruleEngine;
+
+    public ProductReviewOutputParser(ReviewReportRuleEngine ruleEngine) {
+        this.ruleEngine = ruleEngine;
+    }
+
     public ReviewReportDto parseAndValidate(String rawContent, ObjectMapper objectMapper) {
         try {
             ReviewReportDto report = objectMapper.readValue(extractJsonObject(rawContent), ReviewReportDto.class);
             normalize(report);
+            ruleEngine.normalizeTrustedReview(report);
+            ruleEngine.audit(report);
             validate(report);
             return report;
         } catch (BizException ex) {
@@ -41,6 +49,16 @@ public class ProductReviewOutputParser {
         requireList(report.getFeatureRedundancyCheck(), "功能冗余检查不能为空");
         requireList(report.getColdStartProblems(), "冷启动问题不能为空");
         requireList(report.getMvpSuggestions(), "MVP 改造建议不能为空");
+        requireList(report.getDimensionScores(), "评分证据链不能为空");
+        if (report.getKnowledgeBoundary() == null) {
+            throw new BizException(ErrorCode.AI_PROVIDER_ERROR, "事实与假设边界不能为空");
+        }
+        if (report.getOverallAssessment() == null) {
+            throw new BizException(ErrorCode.AI_PROVIDER_ERROR, "总体评分解释不能为空");
+        }
+        if (report.getQualityAudit() == null) {
+            throw new BizException(ErrorCode.AI_PROVIDER_ERROR, "报告质量检查不能为空");
+        }
         if (report.getMinimumBuildVersion() == null) {
             throw new BizException(ErrorCode.AI_PROVIDER_ERROR, "最小可开发版本不能为空");
         }

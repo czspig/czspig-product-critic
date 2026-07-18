@@ -72,6 +72,21 @@ class MockAiProviderTest {
         assertThat(report.getMinimumBuildVersion().getCoreFeatures()).contains("浏览器插件采集");
     }
 
+    @Test
+    void shouldRespectCompleteGenericIdeaInput() {
+        ReviewReportDto report = provider.review(request("""
+                我想做一个给县城连锁药店店长使用的 AI 库存补货助手。目标用户是 3 到 20 家门店规模的药店老板和店长。
+                痛点是药品有效期、季节性需求和医保目录变化让人工补货经常压货或断货。使用场景是店长每天闭店后导入 POS 销售和库存数据。
+                和现有 ERP 不同的是只聚焦小连锁药店的补货决策。商业模式按门店每月订阅收费，先用 5 家药店做试点验证库存周转提升。
+                """), "");
+
+        assertThat(report.getOneLineVerdict()).doesNotContain("校园二手交易");
+        assertThat(report.getGoDecisionReason()).doesNotContain("缺少目标用户");
+        assertThat(report.getGoDecisionReason()).doesNotContain("缺少目标用户、使用场景");
+        assertThat(report.getMinimumBuildVersion().getValidationPlan()).doesNotContain("补充目标用户。", "补充核心场景。");
+        assertThat(report.getMinimumBuildVersion().getValidationPlan()).anyMatch(item -> item.contains("目标用户"));
+    }
+
     private CreateReviewRequest request(String content) {
         return request(content, 2);
     }
