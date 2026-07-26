@@ -2,11 +2,14 @@ package com.czspig.productcritic.ai;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import com.czspig.productcritic.common.BizException;
 import com.czspig.productcritic.common.ErrorCode;
 import com.czspig.productcritic.dto.ReviewReportDto;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Component;
 
@@ -32,6 +35,24 @@ public class ProductReviewOutputParser {
         } catch (Exception ex) {
             throw new BizException(ErrorCode.AI_PROVIDER_ERROR, "AI 输出结构解析失败");
         }
+    }
+
+    public ReviewReportDto parseStrictAndValidate(String rawContent, ObjectMapper objectMapper) {
+        String json = extractJsonObject(rawContent);
+        ReviewReportDto report;
+        try {
+            report = objectMapper.readValue(json, ReviewReportDto.class);
+        } catch (JsonProcessingException ex) {
+            throw parseFailure("INVALID_JSON", "AI 输出不是合法 JSON 对象");
+        }
+        normalizeNullLists(report);
+        normalizeEnums(report);
+        validateTrustedStructureBeforeFallback(report);
+        normalize(report);
+        ruleEngine.normalizeTrustedReview(report);
+        ruleEngine.audit(report);
+        validate(report);
+        return report;
     }
 
     public void validate(ReviewReportDto report) {
@@ -144,6 +165,154 @@ public class ProductReviewOutputParser {
         ));
     }
 
+    private void validateTrustedStructureBeforeFallback(ReviewReportDto report) {
+        if (report == null) {
+            throw parseFailure("SCHEMA_VALIDATION_FAILED", "评审报告为空");
+        }
+        if (report.getOverallAssessment() == null) {
+            throw parseFailure("SCHEMA_VALIDATION_FAILED", "overallAssessment 缺失");
+        }
+        if (report.getKnowledgeBoundary() == null) {
+            throw parseFailure("SCHEMA_VALIDATION_FAILED", "knowledgeBoundary 缺失");
+        }
+        if (report.getQualityAudit() == null) {
+            throw parseFailure("SCHEMA_VALIDATION_FAILED", "qualityAudit 缺失");
+        }
+        if (report.getMinimumBuildVersion() == null) {
+            throw parseFailure("SCHEMA_VALIDATION_FAILED", "minimumBuildVersion 缺失");
+        }
+        List<ReviewReportDto.DimensionScore> dimensions = report.getDimensionScores();
+        if (dimensions == null || dimensions.size() != 6) {
+            throw parseFailure("SCHEMA_VALIDATION_FAILED", "dimensionScores 数量为 "
+                    + (dimensions == null ? 0 : dimensions.size()) + "，预期 6");
+        }
+        Set<String> seen = new HashSet<>();
+        for (ReviewReportDto.DimensionScore dimension : dimensions) {
+            String key = dimension.getDimensionKey();
+            if (!Set.of("painPoint", "marketSpace", "businessModel", "implementationDifficulty", "growthPotential", "riskLevel").contains(key)) {
+                throw parseFailure("SCHEMA_VALIDATION_FAILED", "dimensionScores 包含非法 dimensionKey: " + key);
+            }
+            if (!seen.add(key)) {
+                throw parseFailure("SCHEMA_VALIDATION_FAILED", "dimensionScores 包含重复维度: " + key);
+            }
+            if (!validConfidence(dimension.getConfidence())) {
+                throw parseFailure("SCHEMA_VALIDATION_FAILED", "confidence 的值 " + dimension.getConfidence() + " 不合法，允许 HIGH/MEDIUM/LOW");
+            }
+            if (!validScoreDirection(key, dimension.getScoreDirection())) {
+                throw parseFailure("SCHEMA_VALIDATION_FAILED", "scoreDirection 的值 " + dimension.getScoreDirection() + " 与 " + key + " 不匹配");
+            }
+        }
+    }
+
+    private void normalizeNullLists(ReviewReportDto report) {
+        if (report == null) {
+            return;
+        }
+        if (report.getFakeDemandRisks() == null) {
+            report.setFakeDemandRisks(new ArrayList<>());
+        }
+        if (report.getFeatureRedundancyCheck() == null) {
+            report.setFeatureRedundancyCheck(new ArrayList<>());
+        }
+        if (report.getColdStartProblems() == null) {
+            report.setColdStartProblems(new ArrayList<>());
+        }
+        if (report.getMvpSuggestions() == null) {
+            report.setMvpSuggestions(new ArrayList<>());
+        }
+        if (report.getDimensionScores() == null) {
+            report.setDimensionScores(new ArrayList<>());
+        }
+        report.getDimensionScores().forEach(item -> {
+            if (item.getEvidence() == null) {
+                item.setEvidence(new ArrayList<>());
+            }
+            if (item.getDeductions() == null) {
+                item.setDeductions(new ArrayList<>());
+            }
+            if (item.getMissingInformation() == null) {
+                item.setMissingInformation(new ArrayList<>());
+            }
+            if (item.getImprovementActions() == null) {
+                item.setImprovementActions(new ArrayList<>());
+            }
+        });
+        if (report.getMinimumBuildVersion() != null) {
+            ReviewReportDto.MinimumBuildVersion minimum = report.getMinimumBuildVersion();
+            if (minimum.getCoreFeatures() == null) {
+                minimum.setCoreFeatures(new ArrayList<>());
+            }
+            if (minimum.getExcludedFeatures() == null) {
+                minimum.setExcludedFeatures(new ArrayList<>());
+            }
+            if (minimum.getValidationPlan() == null) {
+                minimum.setValidationPlan(new ArrayList<>());
+            }
+        }
+        if (report.getKnowledgeBoundary() != null) {
+            ReviewReportDto.KnowledgeBoundary boundary = report.getKnowledgeBoundary();
+            if (boundary.getProvidedFacts() == null) {
+                boundary.setProvidedFacts(new ArrayList<>());
+            }
+            if (boundary.getInferences() == null) {
+                boundary.setInferences(new ArrayList<>());
+            }
+            if (boundary.getCriticalHypotheses() == null) {
+                boundary.setCriticalHypotheses(new ArrayList<>());
+            }
+            if (boundary.getUnknowns() == null) {
+                boundary.setUnknowns(new ArrayList<>());
+            }
+            boundary.getCriticalHypotheses().forEach(item -> {
+                if (item.getRelatedDimensions() == null) {
+                    item.setRelatedDimensions(new ArrayList<>());
+                }
+            });
+        }
+        if (report.getQualityAudit() != null) {
+            ReviewReportDto.QualityAudit audit = report.getQualityAudit();
+            if (audit.getChecks() == null) {
+                audit.setChecks(new ArrayList<>());
+            }
+            if (audit.getIssues() == null) {
+                audit.setIssues(new ArrayList<>());
+            }
+            audit.getChecks().forEach(item -> {
+                if (item.getRelatedPaths() == null) {
+                    item.setRelatedPaths(new ArrayList<>());
+                }
+            });
+        }
+    }
+
+    private void normalizeEnums(ReviewReportDto report) {
+        report.setReviewTargetType(upperIfAllowed(report.getReviewTargetType(), Set.of("NEW_IDEA", "MATURE_PRODUCT", "CLIENT_REQUIREMENT", "UNCLEAR")));
+        report.setGoDecision(upperIfAllowed(report.getGoDecision(), Set.of("CONTINUE", "PIVOT", "PAUSE")));
+        if (report.getOverallAssessment() != null) {
+            report.getOverallAssessment().setDecision(upperIfAllowed(
+                    report.getOverallAssessment().getDecision(),
+                    Set.of("PROCEED", "VALIDATE_FIRST", "NARROW_SCOPE", "PAUSE")
+            ));
+        }
+        report.getDimensionScores().forEach(item -> {
+            item.setConfidence(upperIfAllowed(item.getConfidence(), Set.of("HIGH", "MEDIUM", "LOW")));
+            item.setScoreDirection(upperIfAllowed(item.getScoreDirection(), Set.of("HIGHER_IS_BETTER", "HIGHER_IS_WORSE")));
+        });
+        if (report.getKnowledgeBoundary() != null) {
+            report.getKnowledgeBoundary().getInferences().forEach(item ->
+                    item.setConfidence(upperIfAllowed(item.getConfidence(), Set.of("HIGH", "MEDIUM", "LOW"))));
+            report.getKnowledgeBoundary().getCriticalHypotheses().forEach(item ->
+                    item.setImportance(upperIfAllowed(item.getImportance(), Set.of("HIGH", "MEDIUM", "LOW"))));
+        }
+        if (report.getQualityAudit() != null) {
+            report.getQualityAudit().setOverallStatus(upperIfAllowed(report.getQualityAudit().getOverallStatus(), Set.of("PASS", "WARNING", "FAIL")));
+            report.getQualityAudit().getChecks().forEach(item ->
+                    item.setStatus(upperIfAllowed(item.getStatus(), Set.of("PASS", "WARNING", "FAIL"))));
+            report.getQualityAudit().getIssues().forEach(item ->
+                    item.setSeverity(upperIfAllowed(item.getSeverity(), Set.of("HIGH", "MEDIUM", "LOW"))));
+        }
+    }
+
     private void requireText(String value, String message) {
         if (value == null || value.isBlank()) {
             throw new BizException(ErrorCode.AI_PROVIDER_ERROR, message);
@@ -204,22 +373,99 @@ public class ProductReviewOutputParser {
         return Math.max(0, Math.min(100, safe));
     }
 
-    private String extractJsonObject(String rawContent) {
+    String extractJsonObject(String rawContent) {
         if (rawContent == null || rawContent.isBlank()) {
-            throw new BizException(ErrorCode.AI_PROVIDER_ERROR, "AI 输出为空");
+            throw parseFailure("EMPTY_RESPONSE", "AI 输出为空");
         }
-        String normalized = rawContent.trim();
+        String normalized = stripBom(rawContent).strip();
         if (normalized.startsWith("```")) {
             normalized = normalized
                     .replaceFirst("^```(?:json|JSON)?\\s*", "")
                     .replaceFirst("\\s*```$", "")
-                    .trim();
+                    .strip();
+        }
+        if (normalized.startsWith("[")) {
+            throw parseFailure("INVALID_JSON", "AI 输出顶层是数组，预期 JSON 对象");
         }
         int start = normalized.indexOf('{');
-        int end = normalized.lastIndexOf('}');
-        if (start < 0 || end < start) {
-            throw new BizException(ErrorCode.AI_PROVIDER_ERROR, "AI 输出不是 JSON 对象");
+        if (start < 0) {
+            throw parseFailure("INVALID_JSON", "AI 输出不是 JSON 对象");
         }
-        return normalized.substring(start, end + 1);
+        boolean inString = false;
+        boolean escaped = false;
+        int depth = 0;
+        for (int i = start; i < normalized.length(); i++) {
+            char ch = normalized.charAt(i);
+            if (inString) {
+                if (escaped) {
+                    escaped = false;
+                } else if (ch == '\\') {
+                    escaped = true;
+                } else if (ch == '"') {
+                    inString = false;
+                }
+                continue;
+            }
+            if (ch == '"') {
+                inString = true;
+                continue;
+            }
+            if (ch == '{') {
+                depth++;
+            } else if (ch == '}') {
+                depth--;
+                if (depth == 0) {
+                    return normalized.substring(start, i + 1);
+                }
+                if (depth < 0) {
+                    throw parseFailure("INVALID_JSON", "AI 输出 JSON 大括号不匹配");
+                }
+            }
+        }
+        if (depth > 0) {
+            throw parseFailure("OUTPUT_TRUNCATED", "AI 输出疑似被截断，顶层 JSON 对象没有闭合");
+        }
+        throw parseFailure("INVALID_JSON", "AI 输出不是完整 JSON 对象");
+    }
+
+    private String stripBom(String value) {
+        return value != null && !value.isEmpty() && value.charAt(0) == '\uFEFF' ? value.substring(1) : value;
+    }
+
+    private String upperIfAllowed(String value, Set<String> allowed) {
+        if (value == null) {
+            return null;
+        }
+        String normalized = value.trim().toUpperCase();
+        return allowed.contains(normalized) ? normalized : value;
+    }
+
+    private boolean validConfidence(String value) {
+        return Set.of("HIGH", "MEDIUM", "LOW").contains(value);
+    }
+
+    private boolean validScoreDirection(String key, String direction) {
+        if ("implementationDifficulty".equals(key) || "riskLevel".equals(key)) {
+            return "HIGHER_IS_WORSE".equals(direction);
+        }
+        return "HIGHER_IS_BETTER".equals(direction);
+    }
+
+    private OutputParseException parseFailure(String type, String message) {
+        return new OutputParseException(type, message);
+    }
+
+    public static class OutputParseException extends BizException {
+
+        private final String type;
+
+        OutputParseException(String type, String message) {
+            super(ErrorCode.AI_PROVIDER_ERROR, message);
+            this.type = type;
+        }
+
+        public String getType() {
+            return type;
+        }
     }
 }

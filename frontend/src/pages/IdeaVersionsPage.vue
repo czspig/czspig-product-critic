@@ -5,10 +5,19 @@
         <p class="eyebrow">Idea Iterations</p>
         <h1>迭代版本</h1>
       </div>
-      <RouterLink class="secondary-button" to="/history">
-        <ArrowLeft :size="17" />
-        <span>返回历史</span>
-      </RouterLink>
+      <div class="page-toolbar">
+        <RouterLink
+          class="secondary-button strong-action"
+          :to="{ name: 'project-workbench', params: { groupId: route.params.groupId } }"
+        >
+          <LayoutDashboard :size="17" />
+          <span>项目工作台</span>
+        </RouterLink>
+        <RouterLink class="secondary-button" to="/history">
+          <ArrowLeft :size="17" />
+          <span>返回历史</span>
+        </RouterLink>
+      </div>
     </header>
 
     <div v-if="store.loading" class="loading-state">
@@ -102,7 +111,7 @@
 <script setup lang="ts">
 import { computed, onMounted, watch } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
-import { ArrowLeft, CircleAlert, LoaderCircle } from '@lucide/vue';
+import { ArrowLeft, CircleAlert, LayoutDashboard, LoaderCircle } from '@lucide/vue';
 
 import { useReviewStore } from '@/stores/reviewStore';
 import type { QualityStatus, ReviewVersionItem } from '@/types/review';

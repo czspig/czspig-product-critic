@@ -42,10 +42,15 @@ public class ProductReviewPromptBuilder {
                 输出要求：
                 - 只输出合法 JSON 对象，不要 Markdown，不要代码块，不要解释文字。
                 - 必须包含下面所有字段，字段名不能改。
+                - 没有内容的数组输出 []，不得输出 null。
+                - 所有分数字段必须是 0-100 的整数，不要字符串。
+                - 枚举只能使用上面列出的英文值，不要翻译成中文。
                 - dimensionScores 必须包含 6 个维度，dimensionKey 固定为：
                   painPoint, marketSpace, businessModel, implementationDifficulty, growthPotential, riskLevel
-                - providedFacts、criticalHypotheses、unknowns 建议 3-5 项以内。
+                - 每个维度 evidence、deductions、missingInformation、improvementActions 最多 3 条，每条尽量 40 字以内。
+                - providedFacts、inferences、criticalHypotheses、unknowns 最多 5 条，每条尽量 50 字以内。
                 - qualityAudit.overallStatus 可以先给初值，后端会再次用规则聚合。
+                - providerName、modelName、fallbackUsed 由后端生成，不要放进 JSON。
 
                 JSON 结构：
                 {

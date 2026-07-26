@@ -186,6 +186,30 @@ export interface ReviewGroupResponse {
   versions: ReviewVersionItem[];
 }
 
+export interface ProjectWorkbenchResponse {
+  projectId: string;
+  title: string;
+  latestReviewId: number;
+  latestVersionNo: number;
+  updatedAt: string;
+  totalVersions: number;
+  decision?: GoDecision;
+  decisionReason?: string;
+  oneLineVerdict?: string;
+  beatScore?: number;
+  positioningScore?: number;
+  overallScore?: number;
+  qualityStatus?: QualityStatus;
+  qualitySummary?: string;
+  providedFacts: ProvidedFact[];
+  inferences: Inference[];
+  criticalHypotheses: CriticalHypothesis[];
+  unknownQuestions: UnknownQuestion[];
+  successMetric?: string;
+  validationPlan: string[];
+  versions: ReviewVersionItem[];
+}
+
 export interface PageResponse<T> {
   page: number;
   pageSize: number;

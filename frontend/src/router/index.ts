@@ -4,6 +4,7 @@ import HistoryPage from '@/pages/HistoryPage.vue';
 import HomePage from '@/pages/HomePage.vue';
 import IdeaVersionsPage from '@/pages/IdeaVersionsPage.vue';
 import NotFoundPage from '@/pages/NotFoundPage.vue';
+import ProjectWorkbenchPage from '@/pages/ProjectWorkbenchPage.vue';
 import ReviewResultPage from '@/pages/ReviewResultPage.vue';
 
 const router = createRouter({
@@ -12,6 +13,7 @@ const router = createRouter({
     { path: '/', name: 'home', component: HomePage },
     { path: '/reviews/:id', name: 'review-detail', component: ReviewResultPage, props: true },
     { path: '/ideas/:groupId', name: 'idea-versions', component: IdeaVersionsPage, props: true },
+    { path: '/projects/:groupId', name: 'project-workbench', component: ProjectWorkbenchPage, props: true },
     { path: '/history', name: 'history', component: HistoryPage },
     { path: '/:pathMatch(.*)*', name: 'not-found', component: NotFoundPage },
   ],

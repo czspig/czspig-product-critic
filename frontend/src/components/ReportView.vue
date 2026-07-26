@@ -160,6 +160,10 @@
       </div>
 
       <footer class="report-toolbar">
+        <RouterLink class="secondary-button" :to="{ name: 'project-workbench', params: { groupId: review.ideaGroupId || review.id } }">
+          <LayoutDashboard :size="17" />
+          <span>项目工作台</span>
+        </RouterLink>
         <button class="secondary-button" type="button" @click="startNextVersion">
           <RefreshCw :size="17" />
           <span>基于本报告优化想法</span>
@@ -228,7 +232,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { RouterLink, useRouter } from 'vue-router';
-import { ArrowLeft, CircleAlert, ClipboardList, Copy, Download, GitCompare, ImageDown, PackageCheck, RefreshCw, X } from '@lucide/vue';
+import { ArrowLeft, CircleAlert, ClipboardList, Copy, Download, GitCompare, ImageDown, LayoutDashboard, PackageCheck, RefreshCw, X } from '@lucide/vue';
 
 import ListBlock from '@/components/ListBlock.vue';
 import DimensionScoreList from '@/components/DimensionScoreList.vue';

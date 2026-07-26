@@ -41,15 +41,21 @@ public class DeepSeekAiProvider implements AiProvider {
             throw new BizException(ErrorCode.AI_PROVIDER_ERROR, "DeepSeek API Key 未配置");
         }
 
-        String content = callDeepSeek(prompt);
+        DeepSeekResponse response = callDeepSeek(prompt);
         try {
-            return outputParser.parseAndValidate(content, objectMapper);
-        } catch (RuntimeException firstError) {
+            if (response.truncated()) {
+                throw new ProductReviewOutputParser.OutputParseException("OUTPUT_TRUNCATED", "DeepSeek 输出被截断，finish_reason=length");
+            }
+            return outputParser.parseStrictAndValidate(response.content(), objectMapper);
+        } catch (ProductReviewOutputParser.OutputParseException firstError) {
             try {
-                String repairedContent = callDeepSeek(buildRepairPrompt(content));
-                return outputParser.parseAndValidate(repairedContent, objectMapper);
+                DeepSeekResponse repaired = callDeepSeek(buildRepairPrompt(response.content(), firstError));
+                if (repaired.truncated()) {
+                    throw new ProductReviewOutputParser.OutputParseException("OUTPUT_TRUNCATED", "DeepSeek repair 输出被截断，finish_reason=length");
+                }
+                return outputParser.parseStrictAndValidate(repaired.content(), objectMapper);
             } catch (RuntimeException repairError) {
-                throw new BizException(ErrorCode.AI_PROVIDER_ERROR, "DeepSeek 输出不是可用的结构化 JSON，自动修复失败");
+                throw new BizException(ErrorCode.AI_PROVIDER_ERROR, "AI 已返回内容，但报告结构解析失败，请重试。");
             }
         }
     }
@@ -64,7 +70,7 @@ public class DeepSeekAiProvider implements AiProvider {
         return properties.getModel();
     }
 
-    private String callDeepSeek(String prompt) {
+    private DeepSeekResponse callDeepSeek(String prompt) {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(properties.timeout());
         requestFactory.setReadTimeout(properties.timeout());
@@ -73,17 +79,7 @@ public class DeepSeekAiProvider implements AiProvider {
                 .requestFactory(requestFactory)
                 .build();
 
-        Map<String, Object> requestBody = Map.of(
-                "model", properties.getModel(),
-                "messages", List.of(
-                        Map.of("role", "system", "content", "你必须输出合法 JSON 对象，不要使用 Markdown 代码块，不要输出解释文字。"),
-                        Map.of("role", "user", "content", prompt)
-                ),
-                "response_format", Map.of("type", "json_object"),
-                "temperature", properties.getTemperature(),
-                "max_tokens", properties.getMaxTokens(),
-                "stream", false
-        );
+        Map<String, Object> requestBody = requestBody(prompt);
 
         try {
             String responseBody = client.post()
@@ -93,7 +89,7 @@ public class DeepSeekAiProvider implements AiProvider {
                     .body(requestBody)
                     .retrieve()
                     .body(String.class);
-            return extractContent(responseBody);
+            return extractResponse(responseBody);
         } catch (RestClientResponseException ex) {
             throw new BizException(ErrorCode.AI_PROVIDER_ERROR, httpErrorMessage(ex.getStatusCode()));
         } catch (RestClientException ex) {
@@ -101,17 +97,33 @@ public class DeepSeekAiProvider implements AiProvider {
         }
     }
 
-    private String extractContent(String responseBody) {
+    Map<String, Object> requestBody(String prompt) {
+        return Map.of(
+                "model", properties.getModel(),
+                "messages", List.of(
+                        Map.of("role", "system", "content", "你必须输出合法 JSON 对象，不要使用 Markdown 代码块，不要输出解释文字。"),
+                        Map.of("role", "user", "content", prompt)
+                ),
+                "response_format", Map.of("type", "json_object"),
+                "temperature", Math.min(properties.getTemperature(), 0.2),
+                "max_tokens", Math.max(properties.getMaxTokens(), 5000),
+                "stream", false
+        );
+    }
+
+    private DeepSeekResponse extractResponse(String responseBody) {
         if (responseBody == null || responseBody.isBlank()) {
             throw new BizException(ErrorCode.AI_PROVIDER_ERROR, "DeepSeek 返回内容为空");
         }
         try {
             JsonNode root = objectMapper.readTree(responseBody);
-            JsonNode content = root.path("choices").path(0).path("message").path("content");
+            JsonNode choice = root.path("choices").path(0);
+            String finishReason = choice.path("finish_reason").asText("");
+            JsonNode content = choice.path("message").path("content");
             if (content.isMissingNode() || content.asText().isBlank()) {
                 throw new BizException(ErrorCode.AI_PROVIDER_ERROR, "DeepSeek 返回内容为空");
             }
-            return content.asText();
+            return new DeepSeekResponse(content.asText(), finishReason, responseBody.length());
         } catch (BizException ex) {
             throw ex;
         } catch (Exception ex) {
@@ -119,11 +131,27 @@ public class DeepSeekAiProvider implements AiProvider {
         }
     }
 
-    private String buildRepairPrompt(String invalidOutput) {
+    private String buildRepairPrompt(String invalidOutput, ProductReviewOutputParser.OutputParseException error) {
         return """
-                请把下面内容修复为合法 JSON 对象，只输出 JSON，不要输出解释文字或 Markdown。
-                必须保留旧字段，并补齐可信评审字段；缺失字段请根据已有内容做保守兜底，不要编造外部市场数据、用户访谈或营收事实。
-                必须符合这个结构：
+                你不是重新生成评审，而是修复下面 DeepSeek 已输出的 JSON。
+                只输出一个合法 JSON 对象，不要 Markdown 代码围栏，不要解释、前言或总结。
+
+                修复规则：
+                - 必须保留原有语义，只修复 JSON 语法、字段名、类型、枚举和缺失的结构。
+                - 不得虚构新的市场数据、用户事实、访谈、营收、竞品证据或评分依据。
+                - 所有数组不得为 null；没有内容用 []。
+                - 分数字段必须是 0-100 整数，不要字符串。
+                - dimensionScores 必须且只能包含 6 个固定维度。
+                - evidence、deductions、missingInformation、improvementActions 每项最多 3 条。
+                - providedFacts、inferences、criticalHypotheses、unknowns 每项最多 5 条。
+                - implementationDifficulty 和 riskLevel 的 scoreDirection 必须是 HIGHER_IS_WORSE，其余维度必须是 HIGHER_IS_BETTER。
+
+                校验错误：
+                <validation_error>
+                %s: %s
+                </validation_error>
+
+                目标结构：
                 {
                   "oneLineVerdict": "string",
                   "reviewTargetType": "NEW_IDEA | MATURE_PRODUCT | CLIENT_REQUIREMENT | UNCLEAR",
@@ -182,18 +210,15 @@ public class DeepSeekAiProvider implements AiProvider {
                   }
                 }
 
-                字段规则：
-                - beatScore、positioningScore、overallScore、dimensionScores.score 必须是 0-100 整数。
-                - dimensionScores 必须包含 6 个固定维度：painPoint、marketSpace、businessModel、implementationDifficulty、growthPotential、riskLevel。
-                - implementationDifficulty 和 riskLevel 的 scoreDirection 必须是 HIGHER_IS_WORSE，其余维度必须是 HIGHER_IS_BETTER。
-                - providedFacts 只能写用户输入中能定位到原文的信息；无法确认的内容放入 inferences、criticalHypotheses 或 unknowns。
-                - qualityAudit 可以先给初值，后端会再次规则审计。
-
-                待修复内容：
+                待修复原始输出：
                 <invalid_output>
                 %s
                 </invalid_output>
-                """.formatted(invalidOutput == null ? "" : invalidOutput);
+                """.formatted(
+                error.getType(),
+                error.getMessage(),
+                limit(invalidOutput, 12000)
+        );
     }
 
     private String httpErrorMessage(HttpStatusCode statusCode) {
@@ -208,5 +233,18 @@ public class DeepSeekAiProvider implements AiProvider {
             return "DeepSeek 服务暂时不可用，请稍后再试";
         }
         return "DeepSeek 调用失败，HTTP 状态码 " + status;
+    }
+
+    private String limit(String value, int maxLength) {
+        if (value == null) {
+            return "";
+        }
+        return value.length() <= maxLength ? value : value.substring(0, maxLength);
+    }
+
+    record DeepSeekResponse(String content, String finishReason, int responseLength) {
+        boolean truncated() {
+            return "length".equalsIgnoreCase(finishReason);
+        }
     }
 }

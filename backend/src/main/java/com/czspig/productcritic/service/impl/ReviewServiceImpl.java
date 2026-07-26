@@ -5,6 +5,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.List;
 
@@ -20,6 +21,7 @@ import com.czspig.productcritic.common.PageResponse;
 import com.czspig.productcritic.common.ReviewMode;
 import com.czspig.productcritic.common.ReviewStatus;
 import com.czspig.productcritic.dto.CreateReviewRequest;
+import com.czspig.productcritic.dto.ProjectWorkbenchResponse;
 import com.czspig.productcritic.dto.ReviewDetailResponse;
 import com.czspig.productcritic.dto.ReviewGroupResponse;
 import com.czspig.productcritic.dto.ReviewListItemResponse;
@@ -190,18 +192,7 @@ public class ReviewServiceImpl implements ReviewService {
     public ReviewGroupResponse getReviewGroup(String ideaGroupId, String sessionId) {
         String safeSessionId = normalizeSessionId(sessionId);
         String safeGroupId = normalizeIdeaGroupId(ideaGroupId);
-        List<ReviewRecordEntity> records = reviewRecordMapper.selectList(new LambdaQueryWrapper<ReviewRecordEntity>()
-                .eq(ReviewRecordEntity::getSessionId, safeSessionId)
-                .eq(ReviewRecordEntity::getIdeaGroupId, safeGroupId)
-                .isNull(ReviewRecordEntity::getDeletedAt)
-                .orderByAsc(ReviewRecordEntity::getVersionNo)
-                .orderByAsc(ReviewRecordEntity::getCreatedAt));
-        if (records.isEmpty()) {
-            ReviewRecordEntity legacyRecord = findLegacyGroupRecord(safeGroupId, safeSessionId);
-            if (legacyRecord != null) {
-                records = List.of(legacyRecord);
-            }
-        }
+        List<ReviewRecordEntity> records = findGroupRecords(safeGroupId, safeSessionId);
         if (records.isEmpty()) {
             throw new BizException(ErrorCode.NOT_FOUND, "迭代版本不存在");
         }
@@ -210,6 +201,71 @@ public class ReviewServiceImpl implements ReviewService {
         response.setIdeaGroupId(safeGroupId);
         response.setVersions(records.stream().map(this::toReviewVersionItem).toList());
         return response;
+    }
+
+    @Override
+    public ProjectWorkbenchResponse getProjectWorkbench(String ideaGroupId, String sessionId) {
+        String safeSessionId = normalizeSessionId(sessionId);
+        String safeGroupId = normalizeIdeaGroupId(ideaGroupId);
+        List<ReviewRecordEntity> records = findGroupRecords(safeGroupId, safeSessionId);
+        if (records.isEmpty()) {
+            throw new BizException(ErrorCode.NOT_FOUND, "项目不存在");
+        }
+
+        List<ReviewRecordEntity> orderedRecords = records.stream()
+                .sorted(projectVersionComparator())
+                .toList();
+        ReviewRecordEntity latest = orderedRecords.get(orderedRecords.size() - 1);
+        ReviewReportDto report = readReport(latest.getReportJson());
+        ReviewReportDto.KnowledgeBoundary boundary = report.getKnowledgeBoundary();
+        ReviewReportDto.MinimumBuildVersion minimum = report.getMinimumBuildVersion();
+        ReviewReportDto.OverallAssessment assessment = report.getOverallAssessment();
+        ReviewReportDto.QualityAudit quality = report.getQualityAudit();
+
+        ProjectWorkbenchResponse response = new ProjectWorkbenchResponse();
+        response.setProjectId(safeGroupId);
+        response.setTitle(latest.getInputSummary());
+        response.setLatestReviewId(latest.getId());
+        response.setLatestVersionNo(safeVersionNo(latest));
+        response.setUpdatedAt(formatTime(latest.getUpdatedAt() == null ? latest.getCreatedAt() : latest.getUpdatedAt()));
+        response.setTotalVersions(orderedRecords.size());
+        response.setDecision(report.getGoDecision());
+        response.setDecisionReason(report.getGoDecisionReason());
+        response.setOneLineVerdict(latest.getOneLineVerdict());
+        response.setBeatScore(latest.getBeatScore());
+        response.setPositioningScore(latest.getPositioningScore());
+        response.setOverallScore(assessment == null ? null : assessment.getOverallScore());
+        response.setQualityStatus(quality == null ? null : quality.getOverallStatus());
+        response.setQualitySummary(quality == null ? null : quality.getSummary());
+        response.setProvidedFacts(boundary == null ? List.of() : safeList(boundary.getProvidedFacts()));
+        response.setInferences(boundary == null ? List.of() : safeList(boundary.getInferences()));
+        response.setCriticalHypotheses(boundary == null ? List.of() : safeList(boundary.getCriticalHypotheses()));
+        response.setUnknownQuestions(boundary == null ? List.of() : safeList(boundary.getUnknowns()));
+        response.setSuccessMetric(minimum == null ? null : minimum.getSuccessMetric());
+        response.setValidationPlan(minimum == null ? List.of() : safeList(minimum.getValidationPlan()));
+        response.setVersions(orderedRecords.stream().map(this::toReviewVersionItem).toList());
+        return response;
+    }
+
+    private List<ReviewRecordEntity> findGroupRecords(String ideaGroupId, String sessionId) {
+        List<ReviewRecordEntity> records = reviewRecordMapper.selectList(new LambdaQueryWrapper<ReviewRecordEntity>()
+                .eq(ReviewRecordEntity::getSessionId, sessionId)
+                .eq(ReviewRecordEntity::getIdeaGroupId, ideaGroupId)
+                .isNull(ReviewRecordEntity::getDeletedAt)
+                .orderByAsc(ReviewRecordEntity::getVersionNo)
+                .orderByAsc(ReviewRecordEntity::getCreatedAt));
+        if (!records.isEmpty()) {
+            return records;
+        }
+        ReviewRecordEntity legacyRecord = findLegacyGroupRecord(ideaGroupId, sessionId);
+        return legacyRecord == null ? List.of() : List.of(legacyRecord);
+    }
+
+    private Comparator<ReviewRecordEntity> projectVersionComparator() {
+        return Comparator.comparingInt(this::safeVersionNo)
+                .thenComparing(ReviewRecordEntity::getUpdatedAt, Comparator.nullsFirst(Comparator.naturalOrder()))
+                .thenComparing(ReviewRecordEntity::getCreatedAt, Comparator.nullsFirst(Comparator.naturalOrder()))
+                .thenComparing(record -> record.getId() == null ? 0L : record.getId());
     }
 
     private void applyVersionFields(ReviewRecordEntity record, CreateReviewRequest request, String sessionId) {
@@ -350,9 +406,9 @@ public class ReviewServiceImpl implements ReviewService {
         item.setOneLineVerdict(record.getOneLineVerdict());
         item.setSuccessMetric(minimum == null ? "" : minimum.getSuccessMetric());
         item.setMinimumBuildGoal(minimum == null ? "" : minimum.getGoal());
-        item.setCoreFeatures(minimum == null ? List.of() : minimum.getCoreFeatures());
-        item.setExcludedFeatures(minimum == null ? List.of() : minimum.getExcludedFeatures());
-        item.setValidationPlan(minimum == null ? List.of() : minimum.getValidationPlan());
+        item.setCoreFeatures(minimum == null ? List.of() : safeList(minimum.getCoreFeatures()));
+        item.setExcludedFeatures(minimum == null ? List.of() : safeList(minimum.getExcludedFeatures()));
+        item.setValidationPlan(minimum == null ? List.of() : safeList(minimum.getValidationPlan()));
         item.setScoreChangeReason(firstDimensionChangeReason(report));
         item.setConfidenceSummary(confidenceSummary(report));
         item.setCriticalHypotheses(criticalHypotheses(report));
@@ -554,6 +610,10 @@ public class ReviewServiceImpl implements ReviewService {
 
     private String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private <T> List<T> safeList(List<T> values) {
+        return values == null ? List.of() : values;
     }
 
     private String buildSummary(String content) {

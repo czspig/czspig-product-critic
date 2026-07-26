@@ -271,7 +271,103 @@ Mock 结果只代表“模拟评审”，不能当作真实 AI 验收。
 }
 ```
 
-## 6. curl 验证示例
+## 6. 获取项目工作台
+
+`GET /api/projects/{ideaGroupId}`
+
+请求头：
+
+```http
+X-Session-Id: local-test-session
+```
+
+当前阶段暂时由 `ideaGroupId` 承担项目标识。接口只聚合当前 session 下同组的评审记录，不返回原始 `reportJson`；后续引入正式项目实体时，该路径参数会迁移为正式项目 ID，并保留兼容边界。
+
+响应示例：
+
+```json
+{
+  "success": true,
+  "code": "OK",
+  "message": "success",
+  "data": {
+    "projectId": "1",
+    "title": "校园教材交易工具，先验证毕业季同校供需匹配",
+    "latestReviewId": 12,
+    "latestVersionNo": 2,
+    "updatedAt": "2026-07-23 10:30:00",
+    "totalVersions": 2,
+    "decision": "PIVOT",
+    "decisionReason": "先收缩到教材品类和单一校区。",
+    "oneLineVerdict": "方向可验证，但综合交易平台范围过大。",
+    "beatScore": 58,
+    "positioningScore": 72,
+    "overallScore": 68,
+    "qualityStatus": "PASS",
+    "qualitySummary": "关键结论与验证动作完整。",
+    "providedFacts": [
+      {
+        "statement": "毕业季存在集中转卖需求",
+        "sourceText": "用户输入"
+      }
+    ],
+    "inferences": [],
+    "criticalHypotheses": [
+      {
+        "statement": "同校学生愿意线下完成交易",
+        "importance": "HIGH",
+        "impactIfFalse": "供需匹配不能形成闭环",
+        "relatedDimensions": ["user_value"]
+      }
+    ],
+    "unknownQuestions": [
+      {
+        "question": "一周内能否形成足够的有效供需",
+        "reason": "缺少真实交易数据"
+      }
+    ],
+    "successMetric": "一周内完成 10 次有效联系",
+    "validationPlan": ["访谈 5 名毕业生", "发布教材求购表单"],
+    "versions": [
+      {
+        "id": 11,
+        "versionNo": 1,
+        "parentReviewId": null,
+        "goDecision": "CONTINUE",
+        "goDecisionReason": "先验证需求。",
+        "beatScore": 70,
+        "positioningScore": 60,
+        "oneLineVerdict": "需求存在，但范围需要收缩。",
+        "successMetric": "完成 5 次访谈",
+        "minimumBuildGoal": "验证交易意愿",
+        "coreFeatures": ["发布教材", "联系卖家"],
+        "excludedFeatures": ["支付"],
+        "validationPlan": ["访谈目标用户"],
+        "scoreChangeReason": null,
+        "confidenceSummary": "高 1 / 中 3 / 低 2",
+        "criticalHypotheses": ["同校学生愿意线下完成交易"],
+        "qualityStatus": "WARNING",
+        "createdAt": "2026-07-22 10:00:00"
+      }
+    ]
+  }
+}
+```
+
+聚合规则：
+
+- 版本先按 `versionNo`，再按更新时间、创建时间和记录 ID 明确排序；最高版本作为当前决策来源。
+- 标题取当前版本的 `inputSummary`，决策、知识边界、质量状态和验证计划取当前版本的结构化报告。
+- 可选知识边界和验证列表缺失时返回空数组，不返回 `null`。
+- 版本时间线复用同组迭代版本结构并按版本号升序返回。
+
+隔离与错误语义：
+
+- `X-Session-Id` 的默认值和校验规则与 Review 接口一致。
+- 项目不存在或属于其他 session 时统一返回 HTTP `404` 和业务码 `NOT_FOUND`，不会暴露其他 session 是否持有该项目。
+- 旧记录的 `ideaGroupId` 为空时，继续沿用“记录自身 ID 作为组 ID”的兼容规则。
+
+## 7. curl 验证示例
 
 健康检查：
 
@@ -306,7 +402,13 @@ curl -H "X-Session-Id: local-test-session" http://localhost:8080/api/reviews/1
 curl -H "X-Session-Id: local-test-session" http://localhost:8080/api/reviews/group/1
 ```
 
-## 7. DeepSeek 验证样例
+获取项目工作台：
+
+```bash
+curl -H "X-Session-Id: local-test-session" http://localhost:8080/api/projects/1
+```
+
+## 8. DeepSeek 验证样例
 
 如果配置了真实 `DEEPSEEK_API_KEY`，建议分别用以下样例验证：
 

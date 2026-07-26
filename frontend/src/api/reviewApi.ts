@@ -3,6 +3,7 @@ import type {
   ApiResponse,
   CreateReviewPayload,
   PageResponse,
+  ProjectWorkbenchResponse,
   ReviewDetailResponse,
   ReviewGroupResponse,
   ReviewListItemResponse,
@@ -27,5 +28,12 @@ export async function listReviews(page = 1, pageSize = 10) {
 
 export async function getReviewGroup(ideaGroupId: string) {
   const response = await http.get<ApiResponse<ReviewGroupResponse>>(`/reviews/group/${encodeURIComponent(ideaGroupId)}`);
+  return unwrap(response.data);
+}
+
+export async function getProjectWorkbench(ideaGroupId: string) {
+  const response = await http.get<ApiResponse<ProjectWorkbenchResponse>>(
+    `/projects/${encodeURIComponent(ideaGroupId)}`,
+  );
   return unwrap(response.data);
 }

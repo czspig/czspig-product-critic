@@ -5,6 +5,7 @@ import * as reviewApi from '@/api/reviewApi';
 import type {
   CreateReviewPayload,
   PageResponse,
+  ProjectWorkbenchResponse,
   ReviewDetailResponse,
   ReviewGroupResponse,
   ReviewListItemResponse,
@@ -21,26 +22,32 @@ interface DraftContext {
 interface ReviewState {
   currentReview: ReviewDetailResponse | null;
   currentGroup: ReviewGroupResponse | null;
+  currentProject: ProjectWorkbenchResponse | null;
   draftContext: DraftContext | null;
   history: ReviewListItemResponse[];
   historyTotal: number;
   historyPage: number;
   loading: boolean;
   historyLoading: boolean;
+  projectLoading: boolean;
   error: string;
+  projectError: string;
 }
 
 export const useReviewStore = defineStore('review', {
   state: (): ReviewState => ({
     currentReview: null,
     currentGroup: null,
+    currentProject: null,
     draftContext: null,
     history: [],
     historyTotal: 0,
     historyPage: 1,
     loading: false,
     historyLoading: false,
+    projectLoading: false,
     error: '',
+    projectError: '',
   }),
   actions: {
     async create(payload: CreateReviewPayload) {
@@ -97,6 +104,24 @@ export const useReviewStore = defineStore('review', {
       } finally {
         this.loading = false;
       }
+    },
+    async fetchProject(ideaGroupId: string) {
+      this.projectLoading = true;
+      this.projectError = '';
+      this.currentProject = null;
+      try {
+        this.currentProject = await reviewApi.getProjectWorkbench(ideaGroupId);
+        return this.currentProject;
+      } catch (error) {
+        this.projectError = toErrorMessage(error);
+        throw error;
+      } finally {
+        this.projectLoading = false;
+      }
+    },
+    clearProject() {
+      this.currentProject = null;
+      this.projectError = '';
     },
     prepareDraftFromReview(review: ReviewDetailResponse, content: string) {
       const parentVersionNo = review.versionNo || 1;
