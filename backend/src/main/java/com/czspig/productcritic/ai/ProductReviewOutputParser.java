@@ -89,6 +89,27 @@ public class ProductReviewOutputParser {
         requireText(report.getMinimumBuildVersion().getSuccessMetric(), "最小可开发版本成功指标不能为空");
         requireList(report.getMinimumBuildVersion().getValidationPlan(), "最小可开发版本验证计划不能为空");
         requireText(report.getDeveloperPrompt(), "开发 Prompt 不能为空");
+        if (report.getValidationGuide() != null) {
+            var guide = report.getValidationGuide();
+            requireText(guide.decisionReason(), "验证决策理由不能为空");
+            if (guide.risks() == null || guide.risks().size() != 3) throw new BizException(ErrorCode.AI_PROVIDER_ERROR, "验证指南需要三个核心风险");
+            for (var risk : guide.risks()) {
+                if (risk == null) throw new BizException(ErrorCode.AI_PROVIDER_ERROR, "风险不能为空");
+                requireText(risk.title(), "风险标题不能为空");
+                requireText(risk.priorityReason(), "风险排序依据不能为空");
+                requireText(risk.basis(), "风险依据不能为空");
+                requireText(risk.impact(), "风险影响不能为空");
+                requireText(risk.target(), "验证对象不能为空");
+                requireList(risk.steps(), "验证步骤不能为空");
+                requireList(risk.evidenceToCollect(), "需收集的证据不能为空");
+                requireText(risk.referenceThreshold(), "参考判据不能为空");
+                requireText(risk.thresholdReason(), "参考判据理由不能为空");
+                if (!Set.of("FACT", "INFERENCE", "HYPOTHESIS").contains(risk.evidenceType() == null ? "" : risk.evidenceType())) throw new BizException(ErrorCode.AI_PROVIDER_ERROR, "风险依据类型不合法");
+            }
+            requireText(guide.continueWhen(), "继续条件不能为空");
+            requireText(guide.adjustWhen(), "调整条件不能为空");
+            requireText(guide.pauseWhen(), "暂停条件不能为空");
+        }
     }
 
     private void normalize(ReviewReportDto report) {

@@ -1,4 +1,5 @@
 import type { GoDecision, ReviewDetailResponse } from '@/types/review';
+import { projectName } from '@/utils/experience';
 
 export interface ShareCardData {
   title: string;
@@ -22,7 +23,7 @@ export function decisionLabel(decision?: GoDecision) {
 
 export function toShareCardData(review: ReviewDetailResponse): ShareCardData {
   return {
-    title: review.inputSummary || truncate(review.inputContent || '产品想法', 48),
+    title: projectName(review.inputSummary || review.inputContent),
     decision: decisionLabel(review.report?.goDecision),
     beatScore: review.beatScore || 0,
     positioningScore: review.positioningScore || 0,

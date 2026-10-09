@@ -14,9 +14,8 @@
       <header class="project-header">
         <div class="project-heading">
           <p class="eyebrow">Project Workbench</p>
-          <h1>{{ project.title || '未命名项目' }}</h1>
+          <h1>{{ displayName }}</h1>
           <div class="project-meta" aria-label="项目概况">
-            <span>项目 {{ project.projectId }}</span>
             <span>当前 V{{ project.latestVersionNo }}</span>
             <span>共 {{ project.totalVersions }} 个版本</span>
             <span>更新于 {{ project.updatedAt || '暂无时间' }}</span>
@@ -25,14 +24,14 @@
         <div class="project-actions">
           <RouterLink
             class="secondary-button"
-            :to="{ name: 'review-detail', params: { id: project.latestReviewId } }"
+            :to="{ name: 'review-detail', params: { id: project.latestReviewId }, query: { from: route.path } }"
           >
             <FileText :size="17" />
             <span>最新完整报告</span>
           </RouterLink>
           <button class="secondary-button strong-action" type="button" :disabled="actionLoading" @click="continueProject">
             <RefreshCw :class="{ spin: actionLoading }" :size="17" />
-            <span>创建下一版本</span>
+            <span>基于最新版本继续优化</span>
           </button>
           <RouterLink
             class="secondary-button"
@@ -56,11 +55,11 @@
             <h2 id="current-decision-title">当前决策</h2>
           </div>
           <span class="decision-chip" :class="`decision-chip--${decision.toLowerCase()}`">
-            {{ decisionLabels[decision] }}
+            {{ !latestGuide || latestGuide.informationInsufficient ? '信息不足，先验证' : decisionLabels[decision] }}
           </span>
         </div>
         <p class="project-verdict">{{ project.oneLineVerdict || '当前版本暂无一句话结论' }}</p>
-        <p class="project-reason">{{ project.decisionReason || '当前版本暂无决策原因' }}</p>
+        <p class="project-reason">{{ latestGuide?.decisionReason || project.decisionReason || '当前版本暂无决策原因' }}</p>
 
         <dl class="project-score-strip">
           <div>
@@ -152,11 +151,12 @@
             <ListChecks :size="22" />
           </div>
           <div class="success-target">
-            <span>成功指标</span>
-            <strong>{{ project.successMetric || '当前版本尚未定义成功指标' }}</strong>
+            <span>参考验证判据（非已验证结果）</span>
+            <strong>{{ latestGuide?.risks?.[0]?.referenceThreshold || project.successMetric || '当前版本尚未定义判据' }}</strong>
+            <p>{{ latestGuide?.risks?.[0]?.thresholdReason || '旧报告缺少判据理由，需在测试前结合样本和预算确认。' }}</p>
           </div>
           <ol v-if="project.validationPlan.length" class="validation-steps">
-            <li v-for="(item, index) in project.validationPlan" :key="`${index}-${item}`">
+            <li v-for="(item, index) in latestGuide?.risks?.flatMap(r => r.steps || []) || project.validationPlan" :key="`${index}-${item}`">
               <span>{{ String(index + 1).padStart(2, '0') }}</span>
               <p>{{ item }}</p>
             </li>
@@ -186,7 +186,7 @@
             :key="version.id"
             class="project-version-item"
             :class="{ 'project-version-item--current': version.id === project.latestReviewId }"
-            :to="{ name: 'review-detail', params: { id: version.id } }"
+            :to="{ name: 'review-detail', params: { id: version.id }, query: { from: route.path } }"
           >
             <div class="version-item-heading">
               <span>V{{ version.versionNo }}</span>
@@ -226,7 +226,7 @@ import {
 
 import { useReviewStore } from '@/stores/reviewStore';
 import type { ConfidenceLevel, GoDecision, QualityStatus } from '@/types/review';
-import { buildNextDraft } from '@/utils/developmentPackage';
+import { projectDisplayName } from '@/utils/experience';
 
 const route = useRoute();
 const router = useRouter();
@@ -235,6 +235,8 @@ const routeError = ref('');
 const actionError = ref('');
 const actionLoading = ref(false);
 const project = computed(() => store.currentProject);
+const latestGuide = computed(() => project.value?.versions?.find(v => v.id === project.value?.latestReviewId)?.validationGuide);
+const displayName = ref('产品想法项目');
 const decision = computed<GoDecision>(() => project.value?.decision || 'CONTINUE');
 const qualityStatus = computed<QualityStatus>(() => project.value?.qualityStatus || 'WARNING');
 
@@ -260,7 +262,8 @@ async function loadProject() {
   routeError.value = '';
   actionError.value = '';
   try {
-    await store.fetchProject(groupId);
+    const loaded = await store.fetchProject(groupId);
+    displayName.value = await projectDisplayName(loaded);
   } catch {
     // The store exposes the API message through projectError.
   }
@@ -271,9 +274,7 @@ async function continueProject() {
   actionLoading.value = true;
   actionError.value = '';
   try {
-    const review = await store.fetchReview(project.value.latestReviewId);
-    store.prepareDraftFromReview(review, buildNextDraft(review));
-    await router.push({ name: 'home' });
+    await router.push({ name: 'iteration-draft', params: { sourceId: project.value.latestReviewId } });
   } catch {
     actionError.value = store.error || '无法创建下一版本，请稍后重试';
   } finally {

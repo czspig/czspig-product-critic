@@ -11,6 +11,7 @@ export async function copyText(value: string) {
   textarea.style.opacity = '0';
   document.body.appendChild(textarea);
   textarea.select();
-  document.execCommand('copy');
+  const success = document.execCommand('copy');
   document.body.removeChild(textarea);
+  if (!success) throw new Error('复制失败');
 }

@@ -53,6 +53,7 @@ const qualityStatusLabel = computed(() => {
 });
 
 const decisionText = computed(() => {
+  if (props.review.report?.validationGuide?.informationInsufficient || !props.review.report?.validationGuide) return '信息不足，先验证';
   if (assessment.value?.decision) {
     return trustedDecisionLabels[assessment.value.decision];
   }

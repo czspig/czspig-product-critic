@@ -8,10 +8,11 @@
 - 输入增强助手：提示补充目标用户、痛点、使用场景、差异化和商业模式，并提供 3 个示例想法。
 - 毒舌程度调节：温和 / 犀利 / 地狱三档，默认犀利模式。
 - 多维评分展示：基于总分和报告内容展示用户痛点、市场空间、商业模式、实现难度、增长潜力、风险等级。
-- 历史记录和版本迭代：基于 `X-Session-Id` 隔离匿名历史。
+- 历史记录和版本迭代：基于服务端匿名 Cookie 或账号会话隔离，保留项目父子版本关系。
+- 账号体系、邮箱验证、密码找回、项目侧边栏和基础个人中心：详见 [账号配置与迁移](docs/ACCOUNT_SETUP.md)。
 - AI Provider：支持 `auto` / `deepseek` / `mock`。
 
-第一版不实现完整登录、支付、分享链路、复杂后台、多 Agent、RAG 或自动部署。
+本轮已实现基础账号体系；不增加支付、复杂后台、多 Agent、RAG 或自动部署。
 
 ## 技术栈
 
@@ -49,7 +50,7 @@ mysql -u root -p < db/schema.sql
 | `MYSQL_URL` | 本机 `czspig_product_critic` | 否 | MySQL JDBC URL |
 | `MYSQL_USERNAME` | `root` | 否 | MySQL 用户名 |
 | `MYSQL_PASSWORD` | 空 | 否 | MySQL 密码 |
-| `APP_ANONYMOUS_SESSION_ID` | `anonymous-dev-session` | 否 | 未传 `X-Session-Id` 时的默认匿名会话 |
+| `APP_ANONYMOUS_QUOTA` | `3`（暂定） | 否 | 每个服务端匿名身份的成功评审额度，迭代也计数 |
 | `APP_AI_PROVIDER` | `auto` | 否 | `auto` / `deepseek` / `mock` |
 | `APP_AI_FALLBACK_TO_MOCK` | `false` | 否 | DeepSeek 调用失败时是否回退 Mock |
 | `DEEPSEEK_API_KEY` | 空 | DeepSeek 模式必填 | DeepSeek API Key，只能放在后端环境变量或未提交配置 |

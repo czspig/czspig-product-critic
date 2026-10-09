@@ -7,6 +7,7 @@ function list(values: string[] | undefined) {
 
 export function buildNextDraft(review: ReviewDetailResponse) {
   const minimum = review.report?.minimumBuildVersion;
+  const guide = review.report?.validationGuide;
   return `我想把这个产品想法收缩成一个更小、更容易验证的 MVP。
 
 目标：
@@ -19,10 +20,13 @@ ${list(minimum?.coreFeatures)}
 ${list(minimum?.excludedFeatures)}
 
 本轮重点验证：
-${list(minimum?.validationPlan)}
+${list(guide?.risks?.flatMap(r => r.steps || []) || minimum?.validationPlan)}
 
-成功指标：
-${minimum?.successMetric || '让一小批目标用户完成核心任务，并判断是否愿意继续使用。'}`;
+参考判据（尚未验证）：
+${guide?.risks?.[0]?.referenceThreshold || minimum?.successMetric || '让一小批目标用户完成核心任务，并判断是否愿意继续使用。'}
+${guide?.risks?.[0]?.thresholdReason || '测试前先确认样本、基线和预算。'}
+
+请补充实际验证记录与反例；仅修改描述不代表验证已完成。`;
 }
 
 export function buildDevelopmentPackage(review: ReviewDetailResponse) {

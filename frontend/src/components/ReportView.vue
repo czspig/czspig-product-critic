@@ -1,7 +1,18 @@
 <template>
   <article class="report-view">
+    <nav class="page-toolbar context-navigation" aria-label="报告导航">
+      <RouterLink class="secondary-button" :to="returnTarget.path">{{ returnTarget.label }}</RouterLink>
+      <RouterLink class="secondary-button" :to="{ name: 'idea-versions', params: { groupId }, query: { from: '/reviews/' + review.id } }">版本历史</RouterLink>
+      <RouterLink v-if="returnTarget.path !== '/projects/' + groupId" class="secondary-button" :to="{ name: 'project-workbench', params: { groupId } }">项目工作台</RouterLink>
+    </nav>
     <header class="report-cover">
       <div class="report-cover__copy">
+        <div v-if="projectContext" class="report-context" aria-label="报告上下文">
+          <span>{{ projectContext.title }}</span>
+          <strong>正在查看 V{{ review.versionNo || 1 }}</strong>
+          <span v-if="projectContext.latestVersionNo > (review.versionNo || 1)">当前最新 V{{ projectContext.latestVersionNo }}</span>
+          <RouterLink v-if="projectContext.latestVersionNo > (review.versionNo || 1)" :to="{ name: 'review-detail', params: { id: projectContext.latestReviewId } }">查看最新版本</RouterLink>
+        </div>
         <div class="report-stamps">
           <span>产品决策区</span>
           <span>{{ modeLabels[review.mode] }}</span>
@@ -13,6 +24,9 @@
         <p class="eyebrow">PM 评审纪要 / {{ review.createdAt }}</p>
         <h1>{{ review.oneLineVerdict }}</h1>
         <p class="go-reason">{{ goDecisionReason }}</p>
+        <button v-if="review.status === 'SUCCESS'" class="primary-button" type="button" @click="startNextVersion">基于此版本继续优化</button>
+        <p v-if="review.status === 'SUCCESS'" class="report-next-hint">进入{{ nextVersionLabel ? '待生成 V' + nextVersionLabel : '下一版本' }} 草稿，提交后才生成新报告；编号以提交结果为准。</p>
+        <p v-if="actionFeedback" role="status">{{ actionFeedback }}</p>
 
         <div v-if="review.status === 'SUCCESS'" class="report-metrics">
           <div class="risk-panel" :style="{ '--risk': `${boundedBeatScore}%` }">
@@ -27,7 +41,7 @@
         </div>
 
         <p v-if="successMetric" class="success-metric report-success-metric">
-          <strong>成功指标：</strong>{{ successMetric }}
+          <strong>参考验证指标：</strong>{{ successMetric }}（建议值，不是已验证结果）
         </p>
       </div>
       <PixelPig size="large" />
@@ -52,6 +66,8 @@
         </aside>
 
         <div class="report-body">
+          <DecisionEvidencePanel :review="review" />
+          <p>评分是模型对当前描述的辅助判断，不是实测数据或继续投入的依据。</p>
           <ScoreOverviewCard :review="review" />
           <DimensionScoreList :review="review" />
           <KnowledgeBoundaryPanel :review="review" />
@@ -113,7 +129,7 @@
             <ListBlock title="先做这些" :items="report.mvpSuggestions" />
           </section>
 
-          <section id="minimum" class="report-section note-section">
+          <section v-if="report.minimumBuildVersion" id="minimum" class="report-section note-section">
             <div class="section-title">
               <span>06</span>
               <div>
@@ -137,7 +153,7 @@
               </div>
             </div>
             <p v-if="successMetric" class="success-metric">
-              <strong>成功指标：</strong>{{ successMetric }}
+              <strong>参考验证指标：</strong>{{ successMetric }}（{{ report.validationGuide?.risks?.[0]?.thresholdReason || '需在测试前结合样本、基线和预算确认；旧报告未提供阈值理由' }}）
             </p>
             <ListBlock title="验证动作" :items="validationPlan" />
           </section>
@@ -159,19 +175,9 @@
         </div>
       </div>
 
-      <footer class="report-toolbar">
-        <RouterLink class="secondary-button" :to="{ name: 'project-workbench', params: { groupId: review.ideaGroupId || review.id } }">
-          <LayoutDashboard :size="17" />
-          <span>项目工作台</span>
-        </RouterLink>
-        <button class="secondary-button" type="button" @click="startNextVersion">
-          <RefreshCw :size="17" />
-          <span>基于本报告优化想法</span>
-        </button>
-        <RouterLink class="secondary-button" :to="{ name: 'idea-versions', params: { groupId: review.ideaGroupId || review.id } }">
-          <GitCompare :size="17" />
-          <span>查看迭代版本</span>
-        </RouterLink>
+      <details class="report-more-actions">
+        <summary>更多操作</summary>
+        <div class="report-toolbar report-toolbar--secondary">
         <button class="secondary-button" type="button" @click="openPackage">
           <PackageCheck :size="17" />
           <span>生成开发任务包</span>
@@ -180,7 +186,7 @@
           <ImageDown :size="17" />
           <span>生成产品体检卡</span>
         </button>
-        <button class="secondary-button" type="button" @click="downloadMarkdown(review)">
+        <button class="secondary-button" type="button" @click="exportReport">
           <Download :size="17" />
           <span>导出 Markdown</span>
         </button>
@@ -188,15 +194,13 @@
           <ClipboardList :size="17" />
           <span>{{ copied === 'prompt' ? '已复制 Prompt' : '复制开发 Prompt' }}</span>
         </button>
-        <button class="secondary-button strong-action" type="button" @click="copyReport">
+        <button class="secondary-button" type="button" @click="copyReport">
           <Copy :size="17" />
           <span>{{ copied === 'report' ? '已复制报告' : '复制完整报告' }}</span>
         </button>
-        <RouterLink class="secondary-button" to="/">
-          <ArrowLeft :size="17" />
-          <span>返回工作台</span>
-        </RouterLink>
-      </footer>
+        </div>
+      </details>
+      <p v-if="actionFeedback" class="action-feedback" role="status">{{ actionFeedback }}</p>
 
       <div v-if="packageOpen" class="modal-backdrop" role="presentation" @click.self="packageOpen = false">
         <section class="task-package-modal" role="dialog" aria-modal="true" aria-label="开发任务包">
@@ -221,6 +225,7 @@
               <span>下载 Markdown</span>
             </button>
           </footer>
+          <p v-if="actionFeedback" role="status">{{ actionFeedback }}</p>
         </section>
       </div>
 
@@ -230,9 +235,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
-import { RouterLink, useRouter } from 'vue-router';
-import { ArrowLeft, CircleAlert, ClipboardList, Copy, Download, GitCompare, ImageDown, LayoutDashboard, PackageCheck, RefreshCw, X } from '@lucide/vue';
+import { computed, ref, watch } from 'vue';
+import { RouterLink, useRoute, useRouter } from 'vue-router';
+import { CircleAlert, ClipboardList, Copy, Download, ImageDown, PackageCheck, X } from '@lucide/vue';
 
 import ListBlock from '@/components/ListBlock.vue';
 import DimensionScoreList from '@/components/DimensionScoreList.vue';
@@ -240,13 +245,15 @@ import KnowledgeBoundaryPanel from '@/components/KnowledgeBoundaryPanel.vue';
 import PixelPig from '@/components/PixelPig.vue';
 import QualityAuditPanel from '@/components/QualityAuditPanel.vue';
 import ScoreOverviewCard from '@/components/ScoreOverviewCard.vue';
+import DecisionEvidencePanel from '@/components/DecisionEvidencePanel.vue';
 import ShareCardModal from '@/components/share/ShareCardModal.vue';
 import type { ReviewDetailResponse } from '@/types/review';
 import { copyText } from '@/utils/clipboard';
-import { buildDevelopmentPackage, buildNextDraft, downloadTextFile } from '@/utils/developmentPackage';
+import { buildDevelopmentPackage, downloadTextFile } from '@/utils/developmentPackage';
 import { modeLabels, reviewTargetTypeLabels } from '@/utils/labels';
 import { downloadMarkdown } from '@/utils/markdownExport';
-import { useReviewStore } from '@/stores/reviewStore';
+import { getProjectWorkbench } from '@/api/reviewApi';
+import { projectDisplayName, reportReturn } from '@/utils/experience';
 
 const props = defineProps<{
   review: ReviewDetailResponse;
@@ -256,21 +263,25 @@ const copied = ref<'report' | 'prompt' | 'package' | ''>('');
 const packageOpen = ref(false);
 const shareCardOpen = ref(false);
 const router = useRouter();
-const store = useReviewStore();
+const route = useRoute();
+const projectContext = ref<{ title: string; latestVersionNo: number; latestReviewId: number } | null>(null);
+const actionFeedback = ref('');
+const groupId = computed(() => props.review.ideaGroupId || String(props.review.id));
+const returnTarget = computed(() => reportReturn(route.query.from, groupId.value));
 const report = computed(() => props.review.report);
 const developmentPackage = computed(() => buildDevelopmentPackage(props.review));
 const boundedBeatScore = computed(() => Math.min(100, Math.max(0, props.review.beatScore || 0)));
 const goDecision = computed(() => report.value?.goDecision || 'CONTINUE');
-const goDecisionLabel = computed(() => decisionLabels[goDecision.value]);
+const goDecisionLabel = computed(() => report.value?.validationGuide?.informationInsufficient || !report.value?.validationGuide ? '信息不足，先验证' : decisionLabels[goDecision.value]);
 const goDecisionReason = computed(
-  () => report.value?.goDecisionReason || '建议继续验证，但先收缩范围并确认真实用户动机。',
+  () => report.value?.validationGuide?.decisionReason || report.value?.goDecisionReason || '信息不足，先收缩范围并确认真实用户动机。',
 );
 const reviewTargetTypeLabel = computed(() => {
   const type = report.value?.reviewTargetType;
   return type ? reviewTargetTypeLabels[type] : '';
 });
-const successMetric = computed(() => report.value?.minimumBuildVersion?.successMetric || '');
-const validationPlan = computed(() => report.value?.minimumBuildVersion?.validationPlan ?? []);
+const successMetric = computed(() => report.value?.validationGuide?.risks?.[0]?.referenceThreshold || report.value?.minimumBuildVersion?.successMetric || '');
+const validationPlan = computed(() => report.value?.validationGuide?.risks?.flatMap(r => r.steps || []) || report.value?.minimumBuildVersion?.validationPlan || []);
 const providerBadge = computed(() => {
   if (!props.review.providerName) {
     return '';
@@ -280,14 +291,16 @@ const providerBadge = computed(() => {
   }
   return props.review.providerName === 'mock' ? '模拟评审' : props.review.providerName;
 });
+const nextVersionLabel = computed(() => projectContext.value?.latestVersionNo ? projectContext.value.latestVersionNo + 1 : null);
 
 const decisionLabels = {
-  CONTINUE: '建议继续',
+  CONTINUE: '建议继续验证',
   PIVOT: '建议调整方向',
-  PAUSE: '建议暂缓',
+  PAUSE: '建议暂缓投入',
 };
 
 const sections = [
+  { id: 'decision-guide', en: '→', zh: '决策与验证指南' },
   { id: 'pain', en: '01', zh: '用户痛点分析' },
   { id: 'fake-risk', en: '02', zh: '伪需求风险' },
   { id: 'redundancy', en: '03', zh: '功能冗余检查' },
@@ -298,14 +311,25 @@ const sections = [
   { id: 'prompt', en: '08', zh: '开发 Prompt' },
 ];
 
+async function loadProjectContext() {
+  projectContext.value = { title: '产品想法项目', latestVersionNo: 0, latestReviewId: props.review.id };
+  const id = props.review.id;
+  try {
+    const project = await getProjectWorkbench(groupId.value);
+    const title = await projectDisplayName(project);
+    if (id !== props.review.id) return;
+    projectContext.value = { title, latestVersionNo: project.latestVersionNo, latestReviewId: project.latestReviewId };
+  } catch {
+    actionFeedback.value = '最新版本信息暂不可用，可前往项目工作台重试。';
+  }
+}
+
 async function copyReport() {
-  await copyText(props.review.reportMarkdown || props.review.oneLineVerdict);
-  markCopied('report');
+  await copyWithFeedback(props.review.reportMarkdown || props.review.oneLineVerdict, 'report');
 }
 
 async function copyPrompt() {
-  await copyText(report.value?.developerPrompt || '');
-  markCopied('prompt');
+  await copyWithFeedback(report.value?.developerPrompt || '', 'prompt');
 }
 
 function openPackage() {
@@ -313,18 +337,32 @@ function openPackage() {
 }
 
 async function copyPackage() {
-  await copyText(developmentPackage.value);
-  markCopied('package');
+  await copyWithFeedback(developmentPackage.value, 'package');
 }
 
 function downloadPackage() {
-  const date = props.review.createdAt?.slice(0, 10).replaceAll('-', '') || 'review';
-  downloadTextFile(`czspig-dev-package-${date}-${props.review.id}.md`, developmentPackage.value);
+  try {
+    const date = props.review.createdAt?.slice(0, 10).replaceAll('-', '') || 'review';
+    downloadTextFile(`czspig-dev-package-${date}-${props.review.id}.md`, developmentPackage.value);
+    actionFeedback.value = '开发任务包已开始下载。';
+  } catch { actionFeedback.value = '下载失败，请重试。'; }
 }
 
 async function startNextVersion() {
-  store.prepareDraftFromReview(props.review, buildNextDraft(props.review));
-  await router.push({ name: 'home' });
+  await router.push({ name: 'iteration-draft', params: { sourceId: props.review.id }, query: { from: returnTarget.value.path } });
+}
+
+async function copyWithFeedback(text: string, type: 'report' | 'prompt' | 'package') {
+  try {
+    if (!text) throw new Error('empty');
+    await copyText(text);
+    markCopied(type);
+    actionFeedback.value = '已复制。';
+  } catch { actionFeedback.value = '复制失败，请重试或手动选择文本复制。'; }
+}
+function exportReport() {
+  try { downloadMarkdown(props.review); actionFeedback.value = '报告 Markdown 已开始下载。'; }
+  catch { actionFeedback.value = '导出失败，请重试。'; }
 }
 
 function markCopied(type: 'report' | 'prompt' | 'package') {
@@ -333,4 +371,6 @@ function markCopied(type: 'report' | 'prompt' | 'package') {
     copied.value = '';
   }, 1600);
 }
+
+watch(() => props.review.id, loadProjectContext, { immediate: true });
 </script>

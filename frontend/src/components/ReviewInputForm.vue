@@ -31,7 +31,7 @@
     <label class="draft-field">
       <span>把你的产品 idea 摊在桌上</span>
       <textarea
-        v-model.trim="form.content"
+        v-model="form.content"
         maxlength="5000"
         placeholder="例如：我想做一个面向大三大四学生的 AI 简历优化工具，用户在投递前不知道简历和 JD 哪里不匹配..."
       />
@@ -55,6 +55,7 @@
             :key="option.value"
             type="button"
             :class="{ active: form.mode === option.value }"
+            :aria-pressed="form.mode === option.value"
             @click="form.mode = option.value"
           >
             <component :is="option.icon" :size="16" />
@@ -74,6 +75,7 @@
             :key="level.value"
             type="button"
             :class="{ active: form.roastLevel === level.value }"
+            :aria-pressed="form.roastLevel === level.value"
             :title="level.description"
             @click="form.roastLevel = level.value"
           >
@@ -85,7 +87,7 @@
       <button class="primary-button start-review" type="submit" :disabled="loading">
         <LoaderCircle v-if="loading" class="spin" :size="18" />
         <ArrowRight v-else :size="18" />
-        <span>{{ loading ? '评审中' : '开始开喷' }}</span>
+        <span>{{ loading ? '正在生成报告…' : parentReviewId ? '提交草稿并生成新报告' : '生成 V1 评审报告' }}</span>
       </button>
     </div>
   </form>
@@ -111,10 +113,13 @@ const props = defineProps<{
   initialContent?: string;
   ideaGroupId?: string;
   parentReviewId?: number;
+  initialMode?: ReviewMode;
+  initialRoastLevel?: number;
 }>();
 
 const emit = defineEmits<{
   submit: [payload: CreateReviewPayload];
+  draftChange: [payload: CreateReviewPayload];
 }>();
 
 const form = reactive<CreateReviewPayload>({
@@ -188,8 +193,23 @@ watch(
   { immediate: true },
 );
 
+watch(
+  () => [form.content, form.mode, form.roastLevel] as const,
+  () => emit('draftChange', { ...form, ideaGroupId: props.ideaGroupId, parentReviewId: props.parentReviewId }),
+);
+watch(
+  () => props.initialMode,
+  (value) => { if (value) form.mode = value; },
+  { immediate: true },
+);
+watch(
+  () => props.initialRoastLevel,
+  (value) => { if (value) form.roastLevel = value; },
+  { immediate: true },
+);
+
 function handleSubmit() {
-  if (form.content.length < 10) {
+  if (form.content.trim().length < 10) {
     localError.value = '至少输入 10 个字符，产品经理才有得批注。';
     return;
   }

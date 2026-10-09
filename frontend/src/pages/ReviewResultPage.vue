@@ -28,7 +28,11 @@ const store = useReviewStore();
 async function loadReview() {
   const id = Number(route.params.id);
   if (Number.isFinite(id) && id > 0) {
-    await store.fetchReview(id);
+    try { await store.fetchReview(id); }
+    catch { /* Store exposes the request error on this page. */ }
+  } else {
+    store.currentReview = null;
+    store.error = '报告地址无效，请从历史记录或项目工作台进入。';
   }
 }
 

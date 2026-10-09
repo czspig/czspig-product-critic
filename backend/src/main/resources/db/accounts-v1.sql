@@ -1,0 +1,26 @@
+CREATE TABLE IF NOT EXISTS account_schema_versions (version VARCHAR(64) PRIMARY KEY, applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE IF NOT EXISTS accounts (
+ id BIGINT AUTO_INCREMENT PRIMARY KEY,
+ username VARCHAR(32) NOT NULL UNIQUE, nickname VARCHAR(64) NOT NULL,
+ email VARCHAR(254) NOT NULL UNIQUE, password_hash VARCHAR(100) NOT NULL,
+ verified BOOLEAN NOT NULL DEFAULT FALSE, session_version INT NOT NULL DEFAULT 0,
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS account_tokens (
+ token_hash CHAR(64) PRIMARY KEY, account_id BIGINT NOT NULL, purpose VARCHAR(16) NOT NULL,
+ expires_at TIMESTAMP NOT NULL, used BOOLEAN NOT NULL DEFAULT FALSE,
+ INDEX token_account(account_id,purpose)
+);
+CREATE TABLE IF NOT EXISTS anonymous_owners (
+ token_hash CHAR(64) PRIMARY KEY, owner_key VARCHAR(100) NOT NULL UNIQUE,
+ successes INT NOT NULL DEFAULT 0,
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS project_names (
+ owner_key VARCHAR(100) NOT NULL, project_id VARCHAR(64) NOT NULL, name VARCHAR(64) NOT NULL,
+ PRIMARY KEY(owner_key,project_id)
+);
+CREATE TABLE IF NOT EXISTS account_rate_limits (
+ bucket_key CHAR(64) PRIMARY KEY, window_start BIGINT NOT NULL, attempts INT NOT NULL
+);
+INSERT IGNORE INTO account_schema_versions(version) VALUES ('accounts-v1');

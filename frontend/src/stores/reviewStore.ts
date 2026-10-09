@@ -11,19 +11,10 @@ import type {
   ReviewListItemResponse,
 } from '@/types/review';
 
-interface DraftContext {
-  content: string;
-  ideaGroupId: string;
-  parentReviewId: number;
-  parentVersionNo: number;
-  nextVersionNo: number;
-}
-
 interface ReviewState {
   currentReview: ReviewDetailResponse | null;
   currentGroup: ReviewGroupResponse | null;
   currentProject: ProjectWorkbenchResponse | null;
-  draftContext: DraftContext | null;
   history: ReviewListItemResponse[];
   historyTotal: number;
   historyPage: number;
@@ -39,7 +30,6 @@ export const useReviewStore = defineStore('review', {
     currentReview: null,
     currentGroup: null,
     currentProject: null,
-    draftContext: null,
     history: [],
     historyTotal: 0,
     historyPage: 1,
@@ -95,6 +85,7 @@ export const useReviewStore = defineStore('review', {
     async fetchGroup(ideaGroupId: string) {
       this.loading = true;
       this.error = '';
+      this.currentGroup = null;
       try {
         this.currentGroup = await reviewApi.getReviewGroup(ideaGroupId);
         return this.currentGroup;
@@ -122,19 +113,6 @@ export const useReviewStore = defineStore('review', {
     clearProject() {
       this.currentProject = null;
       this.projectError = '';
-    },
-    prepareDraftFromReview(review: ReviewDetailResponse, content: string) {
-      const parentVersionNo = review.versionNo || 1;
-      this.draftContext = {
-        content,
-        ideaGroupId: review.ideaGroupId || String(review.id),
-        parentReviewId: review.id,
-        parentVersionNo,
-        nextVersionNo: parentVersionNo + 1,
-      };
-    },
-    clearDraftContext() {
-      this.draftContext = null;
     },
   },
 });

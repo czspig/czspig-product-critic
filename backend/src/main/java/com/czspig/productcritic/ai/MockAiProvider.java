@@ -42,6 +42,7 @@ public class MockAiProvider implements AiProvider {
         report.setDeveloperPrompt(developerPrompt(profile));
         report.setDimensionScores(dimensionScores(report, profile, content));
         report.setKnowledgeBoundary(knowledgeBoundary(profile, content));
+        report.setValidationGuide(MockValidationGuide.build(report, content));
         report.setOverallAssessment(overallAssessment(report, profile));
         report.setQualityAudit(initialQualityAudit());
         return report;

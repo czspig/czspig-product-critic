@@ -3,6 +3,9 @@ package com.czspig.productcritic.common;
 import org.springframework.http.HttpStatus;
 
 public enum ErrorCode {
+    UNAUTHORIZED("UNAUTHORIZED", "登录已失效，请重新登录", HttpStatus.UNAUTHORIZED),
+    FORBIDDEN("FORBIDDEN", "请求验证失败，请刷新页面", HttpStatus.FORBIDDEN),
+    RATE_LIMITED("RATE_LIMITED", "操作过于频繁，请稍后重试", HttpStatus.TOO_MANY_REQUESTS),
     OK("OK", "success", HttpStatus.OK),
     VALIDATION_ERROR("VALIDATION_ERROR", "请求参数不合法", HttpStatus.BAD_REQUEST),
     NOT_FOUND("NOT_FOUND", "资源不存在", HttpStatus.NOT_FOUND),

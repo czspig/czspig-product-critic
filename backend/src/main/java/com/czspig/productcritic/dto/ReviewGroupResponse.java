@@ -29,6 +29,9 @@ public class ReviewGroupResponse {
         private Long id;
         private Integer versionNo;
         private Long parentReviewId;
+        private String inputSummary;
+        private String inputContent;
+        private ReviewReportDto.ValidationGuide validationGuide;
         private String goDecision;
         private String goDecisionReason;
         private Integer beatScore;
@@ -68,6 +71,13 @@ public class ReviewGroupResponse {
         public void setParentReviewId(Long parentReviewId) {
             this.parentReviewId = parentReviewId;
         }
+
+        public String getInputSummary() { return inputSummary; }
+        public void setInputSummary(String inputSummary) { this.inputSummary = inputSummary; }
+        public String getInputContent() { return inputContent; }
+        public void setInputContent(String inputContent) { this.inputContent = inputContent; }
+        public ReviewReportDto.ValidationGuide getValidationGuide() { return validationGuide; }
+        public void setValidationGuide(ReviewReportDto.ValidationGuide validationGuide) { this.validationGuide = validationGuide; }
 
         public String getGoDecision() {
             return goDecision;

@@ -98,6 +98,7 @@ public class ReviewServiceImpl implements ReviewService {
 
         ReviewRecordEntity record = new ReviewRecordEntity();
         record.setSessionId(safeSessionId);
+        if(safeSessionId.startsWith("account:")) record.setUserId(Long.parseLong(safeSessionId.substring(8)));
         record.setInputContent(safeContent);
         record.setInputSummary(buildSummary(safeContent));
         applyVersionFields(record, request, safeSessionId);
@@ -399,6 +400,9 @@ public class ReviewServiceImpl implements ReviewService {
         item.setId(record.getId());
         item.setVersionNo(safeVersionNo(record));
         item.setParentReviewId(record.getParentReviewId());
+        item.setInputSummary(record.getInputSummary());
+        item.setInputContent(record.getInputContent());
+        item.setValidationGuide(report.getValidationGuide());
         item.setGoDecision(report.getGoDecision());
         item.setGoDecisionReason(report.getGoDecisionReason());
         item.setBeatScore(record.getBeatScore());
@@ -777,6 +781,7 @@ public class ReviewServiceImpl implements ReviewService {
         }
 
         builder.append("## 12. 开发任务 Prompt\n\n");
+        appendValidationGuide(builder, report);
         builder.append("```markdown\n").append(report.getDeveloperPrompt()).append("\n```\n\n");
         builder.append("---\n\n");
         builder.append("评审模式：").append(mode.name()).append("\n\n");
@@ -795,6 +800,24 @@ public class ReviewServiceImpl implements ReviewService {
             builder.append("- ").append(value).append("\n");
         }
         builder.append("\n");
+    }
+
+    private void appendValidationGuide(StringBuilder builder, ReviewReportDto report) {
+        var guide = report.getValidationGuide();
+        if (guide == null) return;
+        builder.append("## 决策与一周验证指南\n\n").append(guide.informationInsufficient() ? "信息不足，先验证。\n\n" : "")
+                .append(guide.decisionReason()).append("\n\n");
+        int index = 0;
+        for (var risk : guide.risks()) {
+            builder.append("### 风险 ").append(++index).append("：").append(risk.title()).append("\n\n")
+                .append("优先理由：").append(risk.priorityReason()).append("\n\n")
+                .append("依据类型：").append(risk.evidenceType()).append("；依据：").append(risk.basis()).append("\n\n")
+                .append("影响：").append(risk.impact()).append("\n\n验证对象：").append(risk.target()).append("\n\n");
+            appendMarkdownList(builder, "步骤", risk.steps());
+            appendMarkdownList(builder, "收集证据", risk.evidenceToCollect());
+            builder.append("参考判据（非已验证结果）：").append(risk.referenceThreshold()).append("\n\n理由：").append(risk.thresholdReason()).append("\n\n");
+        }
+        builder.append("继续：").append(guide.continueWhen()).append("\n\n调整：").append(guide.adjustWhen()).append("\n\n暂缓：").append(guide.pauseWhen()).append("\n\n");
     }
 
     private String overallDecisionLabel(String decision) {

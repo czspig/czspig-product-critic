@@ -100,6 +100,7 @@ export interface QualityAudit {
 }
 
 export interface ReviewReport {
+  validationGuide?: ValidationGuide;
   oneLineVerdict: string;
   reviewTargetType?: ReviewTargetType;
   goDecision?: GoDecision;
@@ -117,6 +118,16 @@ export interface ReviewReport {
   dimensionScores?: DimensionScore[];
   knowledgeBoundary?: KnowledgeBoundary;
   qualityAudit?: QualityAudit;
+}
+
+export interface RiskExperiment {
+  title: string; priorityReason?: string; evidenceType?: string; basis?: string; impact?: string;
+  target?: string; steps?: string[]; evidenceToCollect?: string[];
+  referenceThreshold?: string; thresholdReason?: string;
+}
+export interface ValidationGuide {
+  informationInsufficient?: boolean; decisionReason?: string; risks?: RiskExperiment[];
+  continueWhen?: string; adjustWhen?: string; pauseWhen?: string;
 }
 
 export interface ReviewDetailResponse {
@@ -161,9 +172,12 @@ export interface ReviewListItemResponse {
 }
 
 export interface ReviewVersionItem {
+  inputContent?: string;
+  validationGuide?: ValidationGuide;
   id: number;
   versionNo: number;
   parentReviewId?: number | null;
+  inputSummary?: string;
   goDecision?: GoDecision;
   goDecisionReason?: string;
   beatScore: number;

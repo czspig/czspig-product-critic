@@ -10,13 +10,13 @@ import org.springframework.web.filter.CorsFilter;
 public class CorsConfig {
 
     @Bean
-    public CorsFilter corsFilter() {
+    public CorsFilter corsFilter(@org.springframework.beans.factory.annotation.Value("${app.mail.public-origin:https://localhost}") String origin) {
         CorsConfiguration config = new CorsConfiguration();
-        config.addAllowedOriginPattern("http://localhost:*");
-        config.addAllowedOriginPattern("http://127.0.0.1:*");
+        // Only the configured application origin may read credentialed responses.
+        config.addAllowedOrigin(origin);
         config.addAllowedHeader("*");
         config.addAllowedMethod("*");
-        config.setAllowCredentials(false);
+        config.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/api/**", config);

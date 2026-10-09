@@ -24,6 +24,7 @@
           <span>下载 PNG</span>
         </button>
       </footer>
+      <p role="status">{{ feedback }}</p>
     </section>
   </div>
 </template>
@@ -46,17 +47,22 @@ defineEmits<{
 }>();
 
 const copied = ref(false);
+const feedback = ref('');
 const cardData = computed(() => toShareCardData(props.review));
 
 async function copyCardText() {
-  await copyText(buildShareCardText(props.review));
-  copied.value = true;
-  window.setTimeout(() => {
-    copied.value = false;
-  }, 1600);
+  try {
+    await copyText(buildShareCardText(props.review));
+    copied.value = true;
+    window.setTimeout(() => {
+      copied.value = false;
+    }, 1600);
+    feedback.value = '体检卡文案已复制。';
+  } catch { feedback.value = '复制失败，请重试。'; }
 }
 
 async function downloadCard() {
-  await downloadShareCardPng(props.review);
+  try { await downloadShareCardPng(props.review); feedback.value = 'PNG 已开始下载。'; }
+  catch { feedback.value = '图片生成或下载失败，请重试。'; }
 }
 </script>

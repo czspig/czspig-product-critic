@@ -22,6 +22,15 @@ public class ReviewReportDto {
     private List<DimensionScore> dimensionScores = new ArrayList<>();
     private KnowledgeBoundary knowledgeBoundary;
     private QualityAudit qualityAudit;
+    private ValidationGuide validationGuide;
+
+    public ValidationGuide getValidationGuide() { return validationGuide; }
+    public void setValidationGuide(ValidationGuide validationGuide) { this.validationGuide = validationGuide; }
+    public record ValidationGuide(boolean informationInsufficient, String decisionReason,
+            List<RiskExperiment> risks, String continueWhen, String adjustWhen, String pauseWhen) {}
+    public record RiskExperiment(String title, String priorityReason, String evidenceType, String basis,
+            String impact, String target, List<String> steps, List<String> evidenceToCollect,
+            String referenceThreshold, String thresholdReason) {}
 
     public String getOneLineVerdict() {
         return oneLineVerdict;

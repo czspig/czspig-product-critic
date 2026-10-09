@@ -20,6 +20,11 @@ public class ProductReviewPromptBuilder {
                 - 不把常识、行业印象或模型推测写成“用户已提供事实”。
                 - “用户已提供事实”只能从 <user_input> 原文抽取，每条尽量附 sourceText。
                 - 信息不足时降低 confidence，并生成 unknowns / criticalHypotheses，不要自行补全事实。
+                - 每个核心批评必须引用依据并给行动建议，不能只有情绪评价。
+                - validationGuide 提供最关键的 3 个风险，按成立条件的重要性排序，不能按精确评分作结论。
+                - 每个风险说明事实/推断/假设，basis 仅引用原文或明确说明缺证据；优先低成本一周实验。
+                - 实验包含验证对象、步骤、要收集的证据、参考阈值及选择阈值的理由；阈值不是行业标准或已验证结果。
+                - 信息不足时 informationInsufficient=true，说明缺什么；继续/调整/暂停条件要对应风险。
                 - 所有评分必须附 evidence、deductions、missingInformation、improvementActions。
                 - 风险和实现难度的分数越高代表越危险或越困难，必须写明 scoreDirection。
 
@@ -58,6 +63,14 @@ public class ProductReviewPromptBuilder {
                   "reviewTargetType": "NEW_IDEA | MATURE_PRODUCT | CLIENT_REQUIREMENT | UNCLEAR",
                   "goDecision": "CONTINUE | PIVOT | PAUSE",
                   "goDecisionReason": "string",
+                  "validationGuide": {
+                    "informationInsufficient": true,
+                    "decisionReason": "主要理由与信息缺口",
+                    "risks": [{"title":"核心风险", "priorityReason":"优先验证的理由", "evidenceType":"FACT | INFERENCE | HYPOTHESIS", "basis":"原文依据或推断理由", "impact":"不成立的影响", "target":"具体目标用户或决策人", "steps":["一周内可执行步骤"], "evidenceToCollect":["行为记录或原始证据"], "referenceThreshold":"参考判据", "thresholdReason":"为何选择该判据及样本局限"}],
+                    "continueWhen":"支持继续验证的结果",
+                    "adjustWhen":"需要调整的结果",
+                    "pauseWhen":"需要暂缓的结果"
+                  },
                   "beatScore": 0,
                   "positioningScore": 0,
                   "overallAssessment": {
